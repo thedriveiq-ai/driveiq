@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DriveIQ — Your car, understood.</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0F172A;
+    --blue:#2563EB;
+    --blue-soft:rgba(37,99,235,0.08);
+    --emerald:#10B981;
+    --emerald-soft:rgba(16,185,129,0.10);
+    --amber:#F59E0B;
+    --amber-soft:rgba(245,158,11,0.12);
+    --red:#DC2626;
+    --red-soft:rgba(220,38,38,0.10);
+    --bg:#F8FAFC;
+    --white:#FFFFFF;
+    --line:#E6EAF0;
+    --muted:#64748B;
+    --muted-2:#94A3B8;
+    font-size:16px;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--navy);
+    font-family:'Inter',sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3,.heading{font-family:'Manrope',sans-serif;font-weight:700;}
+  .mono{font-family:'IBM Plex Mono',monospace;}
+  a{color:inherit;}
+
+  /* ---- Top shell ---- */
+  header.app-header{
+    background:var(--white);
+    color:var(--navy);
+    padding:20px 28px;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    position:sticky;
+    top:0;
+    z-index:20;
+    border-bottom:1px solid var(--line);
+  }
+  .brand{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    font-family:'Manrope',sans-serif;
+    font-weight:800;
+    letter-spacing:-0.01em;
+    font-size:1.15rem;
+  }
+  .brand svg{flex-shrink:0;}
+  header .status{
+    font-size:0.78rem;
+    color:var(--muted);
+    font-weight:500;
+  }
+  nav.tabs{
+    display:flex;
+    gap:4px;
+    background:var(--white);
+    border-bottom:1px solid var(--line);
+    padding:0 24px;
+    overflow-x:auto;
+  }
+  nav.tabs button{
+    background:none;border:none;
+    color:var(--muted);
+    font-family:'Inter',sans-serif;
+    font-weight:600;
+    font-size:0.88rem;
+    padding:14px 16px;
+    cursor:pointer;
+    border-bottom:2px solid transparent;
+    white-space:nowrap;
+  }
+  nav.tabs button.active{
+    color:var(--navy);
+    border-bottom-color:var(--blue);
+  }
+  main{
+    max-width:900px;
+    margin:0 auto;
+    padding:36px 24px 90px;
+  }
+  .view{display:none;}
+  .view.active{display:block;}
+
+  h1{font-size:1.6rem;letter-spacing:-0.01em;margin:0 0 8px;}
+  h2{font-size:1.1rem;letter-spacing:-0.01em;margin:0 0 6px;}
+  .eyebrow{
+    font-family:'Inter',sans-serif;
+    font-size:0.78rem;
+    font-weight:600;
+    color:var(--blue);
+    margin-bottom:8px;
+    display:block;
+  }
+  p.lead{color:var(--muted);margin:0 0 24px;font-size:0.98rem;line-height:1.55;}
+
+  .card{
+    background:var(--white);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:24px;
+    margin-bottom:18px;
+    box-shadow:0 1px 2px rgba(15,23,42,0.04);
+  }
+  .card.hero{
+    background:var(--navy);
+    color:var(--white);
+    border:none;
+  }
+  .card.hero .muted{color:#94A3B8;}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+  @media(max-width:640px){.grid2{grid-template-columns:1fr;}}
+
+  label{
+    display:block;
+    font-family:'Inter',sans-serif;
+    font-size:0.8rem;
+    font-weight:600;
+    color:var(--muted);
+    margin-bottom:6px;
+  }
+  input,select,textarea{
+    width:100%;
+    padding:11px 14px;
+    border:1px solid var(--line);
+    border-radius:10px;
+    font-family:'Inter',sans-serif;
+    font-size:0.95rem;
+    background:var(--bg);
+    color:var(--navy);
+    margin-bottom:16px;
+    transition:border-color 0.15s;
+  }
+  input:focus,textarea:focus{outline:none;border-color:var(--blue);background:var(--white);}
+  textarea{resize:vertical;min-height:76px;}
+
+  button.btn{
+    background:var(--blue);
+    color:var(--white);
+    border:none;
+    padding:12px 22px;
+    border-radius:10px;
+    font-weight:600;
+    font-size:0.92rem;
+    cursor:pointer;
+    font-family:'Inter',sans-serif;
+    transition:background 0.15s;
+  }
+  button.btn:hover{background:#1D4ED8;}
+  button.btn.ghost{
+    background:none;border:1px solid var(--line);color:var(--navy);
+  }
+  button.btn.ghost:hover{background:var(--bg);}
+  button.btn:disabled{opacity:0.5;cursor:default;}
+
+  /* dashboard readout */
+  .readout-row{
+    display:flex;justify-content:space-between;align-items:baseline;
+    padding:12px 0;border-bottom:1px solid var(--line);
+    font-size:0.92rem;
+  }
+  .readout-row:last-child{border-bottom:none;}
+  .readout-row .val{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:0.9rem;}
+  .card.hero .readout-row{border-color:rgba(255,255,255,0.1);}
+  .readout-row.warn .val{color:#F87171;}
+  .readout-row.ok .val{color:#34D399;}
+  .readout-row.soon .val{color:#FBBF24;}
+  .readout-row.warn .val, .readout-row.soon .val{color:var(--red);}
+  .card:not(.hero) .readout-row.ok .val{color:var(--emerald);}
+  .card:not(.hero) .readout-row.soon .val{color:var(--amber);}
+  .card:not(.hero) .readout-row.warn .val{color:var(--red);}
+
+  .empty{
+    text-align:center;padding:48px 20px;color:var(--muted);
+  }
+  .empty .btn{margin-top:14px;}
+
+  /* chips */
+  .chip-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:18px;}
+  .chip{
+    padding:9px 15px;border:1px solid var(--line);border-radius:20px;
+    cursor:pointer;font-size:0.86rem;background:var(--white);font-weight:500;
+    transition:all 0.15s;
+  }
+  .chip.selected{background:var(--blue-soft);color:var(--blue);border-color:var(--blue);font-weight:600;}
+
+  /* result panel — calm, not "scanner" */
+  .result-panel{
+    background:var(--white);
+    border:1px solid var(--line);
+    border-radius:16px;
+    padding:24px;
+  }
+  .verdict{
+    display:flex;align-items:center;gap:12px;
+    padding:16px 18px;border-radius:12px;font-weight:700;margin-bottom:20px;
+    font-size:1rem;
+  }
+  .verdict .icon{
+    width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  }
+  .verdict.yes{background:var(--emerald-soft);color:#047857;}
+  .verdict.yes .icon{background:var(--emerald);color:#fff;}
+  .verdict.no{background:var(--amber-soft);color:#B45309;}
+  .verdict.no .icon{background:var(--amber);color:#fff;}
+  .verdict.emergency{background:var(--red-soft);color:#B91C1C;}
+  .verdict.emergency .icon{background:var(--red);color:#fff;}
+
+  .fault-row{margin-bottom:16px;}
+  .fault-row .top{display:flex;justify-content:space-between;font-size:0.92rem;font-weight:600;color:var(--navy);margin-bottom:6px;}
+  .fault-row .top .pct{font-family:'IBM Plex Mono',monospace;color:var(--blue);font-weight:600;font-size:0.85rem;}
+  .bar-track{height:6px;background:var(--bg);border-radius:4px;overflow:hidden;}
+  .bar-fill{height:100%;background:var(--blue);border-radius:4px;}
+
+  .result-meta{
+    display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:20px;
+  }
+  .result-meta .box{background:var(--bg);padding:14px 16px;border-radius:12px;}
+  .result-meta .box .lab{color:var(--muted);font-size:0.76rem;font-weight:600;margin-bottom:5px;}
+  .result-meta .box .num{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:1rem;}
+
+  ul.q-list{margin:10px 0 0;padding-left:20px;font-size:0.9rem;color:var(--muted);line-height:1.7;}
+
+  .diary-entry{border-left:3px solid var(--blue);padding:12px 0 12px 16px;margin-bottom:12px;}
+  .diary-entry .when{font-size:0.78rem;color:var(--muted-2);font-weight:600;}
+  .badge{
+    display:inline-block;font-size:0.72rem;font-weight:600;
+    padding:3px 10px;border-radius:12px;
+    background:var(--blue-soft);color:var(--blue);margin-left:8px;
+  }
+  footer{
+    text-align:center;color:var(--muted-2);font-size:0.8rem;padding:36px 20px;
+  }
+  .loading{color:var(--muted);font-size:0.92rem;}
+  .loading::after{content:'…';animation:dots 1.2s steps(4,end) infinite;}
+  @keyframes dots{0%,20%{content:'.'}40%{content:'..'}60%,100%{content:'...'}}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="brand">
+    <svg width="26" height="26" viewBox="0 0 26 26" fill="none">
+      <path d="M2 20 L13 6 L24 20" stroke="#2563EB" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+      <line x1="6" y1="20" x2="20" y2="20" stroke="#0F172A" stroke-width="2.4" stroke-linecap="round"/>
+    </svg>
+    DriveIQ
+  </div>
+  <div class="status" id="header-vehicle">No vehicle added</div>
+</header>
+
+<nav class="tabs">
+  <button data-tab="dashboard" class="active">Home</button>
+  <button data-tab="checker">What's wrong?</button>
+  <button data-tab="translator">Translate</button>
+  <button data-tab="vehicle">My car</button>
+  <button data-tab="diary">History</button>
+</nav>
+
+<main>
+
+  <!-- DASHBOARD -->
+  <section class="view active" id="view-dashboard">
+    <span class="eyebrow">Home</span>
+    <h1>Your car, understood.</h1>
+    <p class="lead">Everything you need to feel confident about your car — in plain English, whenever you need it.</p>
+
+    <div id="dash-empty" class="empty" style="display:none;">
+      <p>Add your car and we'll keep an eye on the dates that matter.</p>
+      <button class="btn" onclick="switchTab('vehicle')">Add your car</button>
+    </div>
+
+    <div id="dash-content" style="display:none;">
+      <div class="card hero">
+        <span class="eyebrow" style="color:#60A5FA;">Your car</span>
+        <h2 id="dash-vehicle-name" style="color:#fff;">—</h2>
+        <div class="readout-row">
+          <span class="muted">Mileage</span><span class="val" id="dash-mileage">—</span>
+        </div>
+        <div class="readout-row" id="dash-mot-row">
+          <span class="muted">MOT expires</span><span class="val" id="dash-mot">—</span>
+        </div>
+        <div class="readout-row" id="dash-service-row">
+          <span class="muted">Next service due</span><span class="val" id="dash-service">—</span>
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="card" style="cursor:pointer;" onclick="switchTab('checker')">
+          <span class="eyebrow">Something feel off?</span>
+          <h2>Tell us what's happening</h2>
+          <p class="lead" style="margin-bottom:10px;">A few quick questions, then a clear answer: what it likely is, whether it's safe to drive, and what it should cost.</p>
+          <button class="btn">Get started →</button>
+        </div>
+        <div class="card" style="cursor:pointer;" onclick="switchTab('translator')">
+          <span class="eyebrow">Confused by a quote?</span>
+          <h2>Translate it</h2>
+          <p class="lead" style="margin-bottom:10px;">Paste what the garage told you. We'll explain it simply and tell you if it's urgent.</p>
+          <button class="btn ghost">Translate a quote →</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SYMPTOM CHECKER -->
+  <section class="view" id="view-checker">
+    <span class="eyebrow">AI car companion</span>
+    <h1>What's going on with your car?</h1>
+    <p class="lead">Answer honestly — there's no detail too small. This won't replace a real mechanic, but it will help you understand what you're dealing with before you call one.</p>
+
+    <div class="card" id="checker-form">
+      <label>What's happening?</label>
+      <textarea id="c-main" placeholder="e.g. the car won't start, or there's a grinding noise when I brake..."></textarea>
+
+      <label>Did anything happen when you tried to start it?</label>
+      <div class="chip-row" data-group="click">
+        <div class="chip" data-val="rapid clicking">Rapid clicking</div>
+        <div class="chip" data-val="single click">A single click</div>
+        <div class="chip" data-val="no sound at all">Nothing at all</div>
+        <div class="chip" data-val="not applicable">Not applicable</div>
+      </div>
+
+      <label>Any warning lights on?</label>
+      <div class="chip-row" data-group="lights">
+        <div class="chip" data-val="battery light">Battery light</div>
+        <div class="chip" data-val="engine management light">Engine light</div>
+        <div class="chip" data-val="oil light">Oil light</div>
+        <div class="chip" data-val="no lights">No lights</div>
+        <div class="chip" data-val="not sure">Not sure</div>
+      </div>
+
+      <label>Any smoke or an unusual smell?</label>
+      <div class="chip-row" data-group="smoke">
+        <div class="chip" data-val="smoke">Smoke</div>
+        <div class="chip" data-val="burning smell">Burning smell</div>
+        <div class="chip" data-val="fuel smell">Fuel smell</div>
+        <div class="chip" data-val="none">None</div>
+      </div>
+
+      <label>Has it lost power, or is it just noisy?</label>
+      <div class="chip-row" data-group="power">
+        <div class="chip" data-val="lost power">Lost power</div>
+        <div class="chip" data-val="still drives normally">Still drives normally</div>
+        <div class="chip" data-val="won't move at all">Won't move at all</div>
+      </div>
+
+      <label>Anything happen just before this started? (optional)</label>
+      <input type="text" id="c-before" placeholder="e.g. drove through a flood, cold morning, a long motorway trip...">
+
+      <button class="btn" onclick="runDiagnosis()">Get my answer</button>
+    </div>
+
+    <div id="checker-result"></div>
+  </section>
+
+  <!-- GARAGE TRANSLATOR -->
+  <section class="view" id="view-translator">
+    <span class="eyebrow">Plain English</span>
+    <h1>Translate what the garage said</h1>
+    <p class="lead">Paste it exactly as they told you. We'll explain what it means, how urgent it is, and a fair UK price range.</p>
+
+    <div class="card">
+      <label>What did they say?</label>
+      <textarea id="t-quote" placeholder='e.g. "You need new lower suspension bushes and the offside wishbone is worn."'></textarea>
+      <button class="btn" onclick="runTranslate()">Translate it</button>
+    </div>
+
+    <div id="translate-result"></div>
+  </section>
+
+  <!-- VEHICLE / GARAGE -->
+  <section class="view" id="view-vehicle">
+    <span class="eyebrow">My car</span>
+    <h1>Your car's details</h1>
+    <p class="lead">Everything about your car, kept in one place. The free plan keeps one car.</p>
+
+    <div class="card">
+      <div class="grid2">
+        <div>
+          <label>Registration</label>
+          <input id="v-reg" placeholder="AB12 CDE">
+        </div>
+        <div>
+          <label>Make &amp; model</label>
+          <input id="v-model" placeholder="Ford Fiesta">
+        </div>
+        <div>
+          <label>Year</label>
+          <input id="v-year" placeholder="2018">
+        </div>
+        <div>
+          <label>Current mileage</label>
+          <input id="v-mileage" placeholder="42,000">
+        </div>
+        <div>
+          <label>MOT expiry date</label>
+          <input id="v-mot" type="date">
+        </div>
+        <div>
+          <label>Next service due date</label>
+          <input id="v-service" type="date">
+        </div>
+      </div>
+      <button class="btn" onclick="saveVehicle()">Save</button>
+      <span id="vehicle-saved-msg" class="mono" style="display:none;color:var(--emerald);margin-left:12px;font-size:0.85rem;font-weight:600;">Saved ✓</span>
+    </div>
+  </section>
+
+  <!-- DIARY -->
+  <section class="view" id="view-diary">
+    <span class="eyebrow">Your history</span>
+    <h1>Everything, remembered</h1>
+    <p class="lead">Every answer we've given you is logged here, so you've got a record when you speak to a garage.</p>
+    <div id="diary-list"></div>
+  </section>
+
+</main>
+
+<footer>
+  DriveIQ — not a substitute for a qualified mechanic. In an emergency, pull over safely and call for assistance.
+</footer>
+
+<script>
+const STORAGE_KEY = 'driveiq_vehicle_v1';
+const DIARY_KEY = 'driveiq_diary_v1';
+const AI_ENDPOINT = '/.netlify/functions/ai-diagnose';
+
+function switchTab(tab){
+  document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+tab).classList.add('active');
+  if(tab==='dashboard') renderDashboard();
+  if(tab==='diary') renderDiary();
+}
+document.querySelectorAll('nav.tabs button').forEach(b=>{
+  b.addEventListener('click', ()=>switchTab(b.dataset.tab));
+});
+
+document.querySelectorAll('.chip-row').forEach(row=>{
+  row.addEventListener('click', (e)=>{
+    if(!e.target.classList.contains('chip')) return;
+    row.querySelectorAll('.chip').forEach(c=>c.classList.remove('selected'));
+    e.target.classList.add('selected');
+  });
+});
+function selectedChip(group){
+  const row = document.querySelector(`.chip-row[data-group="${group}"]`);
+  const sel = row.querySelector('.chip.selected');
+  return sel ? sel.dataset.val : null;
+}
+
+function getVehicle(){
+  try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)); }catch(e){ return null; }
+}
+function saveVehicle(){
+  const v = {
+    reg: document.getElementById('v-reg').value,
+    model: document.getElementById('v-model').value,
+    year: document.getElementById('v-year').value,
+    mileage: document.getElementById('v-mileage').value,
+    mot: document.getElementById('v-mot').value,
+    service: document.getElementById('v-service').value
+  };
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(v));
+  document.getElementById('vehicle-saved-msg').style.display='inline';
+  setTimeout(()=>document.getElementById('vehicle-saved-msg').style.display='none', 2000);
+  updateHeader();
+}
+function loadVehicleForm(){
+  const v = getVehicle();
+  if(!v) return;
+  document.getElementById('v-reg').value = v.reg||'';
+  document.getElementById('v-model').value = v.model||'';
+  document.getElementById('v-year').value = v.year||'';
+  document.getElementById('v-mileage').value = v.mileage||'';
+  document.getElementById('v-mot').value = v.mot||'';
+  document.getElementById('v-service').value = v.service||'';
+}
+function updateHeader(){
+  const v = getVehicle();
+  document.getElementById('header-vehicle').textContent = v && v.model ? `${v.model} · ${v.reg||''}` : 'No vehicle added';
+}
+function daysUntil(dateStr){
+  if(!dateStr) return null;
+  const diff = (new Date(dateStr) - new Date());
+  return Math.ceil(diff/(1000*60*60*24));
+}
+function renderDashboard(){
+  const v = getVehicle();
+  if(!v || !v.model){
+    document.getElementById('dash-empty').style.display='block';
+    document.getElementById('dash-content').style.display='none';
+    return;
+  }
+  document.getElementById('dash-empty').style.display='none';
+  document.getElementById('dash-content').style.display='block';
+  document.getElementById('dash-vehicle-name').textContent = `${v.model}${v.year ? ' ('+v.year+')' : ''}`;
+  document.getElementById('dash-mileage').textContent = v.mileage ? v.mileage+' mi' : '—';
+
+  const motDays = daysUntil(v.mot);
+  const motRow = document.getElementById('dash-mot-row');
+  const motEl = document.getElementById('dash-mot');
+  if(motDays===null){ motEl.textContent='—'; motRow.className='readout-row'; }
+  else{
+    motEl.textContent = motDays<0 ? 'Expired' : `${motDays} days (${v.mot})`;
+    motRow.className = 'readout-row ' + (motDays<0||motDays<14 ? 'warn' : motDays<45 ? 'soon' : 'ok');
+  }
+  const svcDays = daysUntil(v.service);
+  const svcRow = document.getElementById('dash-service-row');
+  const svcEl = document.getElementById('dash-service');
+  if(svcDays===null){ svcEl.textContent='—'; svcRow.className='readout-row'; }
+  else{
+    svcEl.textContent = svcDays<0 ? 'Overdue' : `${svcDays} days (${v.service})`;
+    svcRow.className = 'readout-row ' + (svcDays<0||svcDays<14 ? 'warn' : svcDays<45 ? 'soon' : 'ok');
+  }
+}
+
+function getDiary(){
+  try{ return JSON.parse(localStorage.getItem(DIARY_KEY)) || []; }catch(e){ return []; }
+}
+function addDiaryEntry(type, summary){
+  const d = getDiary();
+  d.unshift({ type, summary, when: new Date().toLocaleString('en-GB') });
+  localStorage.setItem(DIARY_KEY, JSON.stringify(d.slice(0,50)));
+}
+function renderDiary(){
+  const d = getDiary();
+  const el = document.getElementById('diary-list');
+  if(d.length===0){
+    el.innerHTML = '<div class="empty">Nothing here yet. Ask about a symptom or translate a quote to get started.</div>';
+    return;
+  }
+  el.innerHTML = d.map(e=>`
+    <div class="diary-entry">
+      <div class="when">${e.when} <span class="badge">${e.type}</span></div>
+      <div>${e.summary}</div>
+    </div>
+  `).join('');
+}
+
+async function runDiagnosis(){
+  const payload = {
+    description: document.getElementById('c-main').value,
+    click: selectedChip('click'),
+    lights: selectedChip('lights'),
+    smoke: selectedChip('smoke'),
+    power: selectedChip('power'),
+    before: document.getElementById('c-before').value
+  };
+  if(!payload.description){
+    alert("Let us know what's happening first.");
+    return;
+  }
+  const resultEl = document.getElementById('checker-result');
+  resultEl.innerHTML = '<p class="loading">Working it out</p>';
+
+  let data;
+  try{
+    const res = await fetch(AI_ENDPOINT, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ mode:'diagnose', payload })
+    });
+    data = await res.json();
+    if(data.error) throw new Error(data.error);
+  }catch(e){
+    data = localDiagnosisFallback(payload);
+  }
+  renderDiagnosis(data);
+  addDiaryEntry('Diagnosis', payload.description);
+}
+
+function verdictIcon(kind){
+  if(kind==='yes') return '✓';
+  if(kind==='emergency') return '!';
+  return '•';
+}
+function renderDiagnosis(d){
+  const el = document.getElementById('checker-result');
+  const kind = d.safeToDrive === 'no' ? 'no' : d.safeToDrive === 'emergency' ? 'emergency' : 'yes';
+  const bannerText = kind === 'no' ? "We'd hold off driving this until it's checked" :
+                      kind === 'emergency' ? 'Please stop and get help now — this needs attention right away' :
+                      "This looks safe to drive, with a bit of care";
+  el.innerHTML = `
+    <div class="result-panel">
+      <div class="verdict ${kind}"><span class="icon">${verdictIcon(kind)}</span><span>${bannerText}</span></div>
+      ${d.likelihood.map(f=>`
+        <div class="fault-row">
+          <div class="top"><span>${f.fault}</span><span class="pct">${f.confidence}%</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:${f.confidence}%;"></div></div>
+        </div>
+      `).join('')}
+      <div class="result-meta">
+        <div class="box"><div class="lab">Likely cost</div><div class="num">${d.cost}</div></div>
+        <div class="box"><div class="lab">Typical repair time</div><div class="num">${d.repairTime}</div></div>
+      </div>
+      <div style="margin-top:18px;">
+        <div class="lab" style="color:var(--muted);font-size:0.8rem;font-weight:600;margin-bottom:4px;">Worth asking your mechanic</div>
+        <ul class="q-list">${d.questions.map(q=>`<li>${q}</li>`).join('')}</ul>
+      </div>
+    </div>
+  `;
+}
+
+function localDiagnosisFallback(p){
+  const emergency = p.smoke === 'smoke' || p.power === "won't move at all";
+  return {
+    safeToDrive: emergency ? 'emergency' : (p.lights === 'engine management light' ? 'no' : 'yes'),
+    likelihood: [
+      { fault: p.click === 'rapid clicking' ? 'Your battery is low or failing' : 'A fault with the starter motor or ignition', stars: 4, confidence: 72 },
+      { fault: "Your battery isn't receiving enough power while you're driving — often the charging system rather than the battery itself", stars: 3, confidence: 45 },
+      { fault: 'A loose or corroded battery connection', stars: 2, confidence: 30 }
+    ],
+    cost: '£80–£220',
+    repairTime: '30–90 minutes',
+    questions: [
+      'Can you test the battery and charging system while I wait?',
+      'Is this covered under warranty or breakdown cover?',
+      'What would happen if I kept driving it as it is?'
+    ]
+  };
+}
+
+async function runTranslate(){
+  const quote = document.getElementById('t-quote').value;
+  if(!quote){ alert('Paste what the garage told you first.'); return; }
+  const el = document.getElementById('translate-result');
+  el.innerHTML = '<p class="loading">Translating</p>';
+
+  let data;
+  try{
+    const res = await fetch(AI_ENDPOINT, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ mode:'translate', payload:{ quote } })
+    });
+    data = await res.json();
+    if(data.error) throw new Error(data.error);
+  }catch(e){
+    data = {
+      plainEnglish: "This is about a worn part in the steering or suspension. It affects comfort and handling, and it's rarely an immediate safety issue — but it's worth confirming with the garage rather than assuming.",
+      urgency: 'Book it in over the next few weeks',
+      cost: '£120–£350',
+      questions: ['Is this a genuine safety issue, or just advisory?', 'Would you mind if I got a second quote?', 'What happens if I leave it another month?']
+    };
+  }
+  el.innerHTML = `
+    <div class="result-panel">
+      <span class="eyebrow">In plain English</span>
+      <p style="font-size:0.98rem;line-height:1.6;">${data.plainEnglish}</p>
+      <div class="readout-row"><span>How urgent</span><span class="val" style="color:var(--navy);">${data.urgency}</span></div>
+      <div class="readout-row"><span>Typical UK cost</span><span class="val" style="color:var(--navy);">${data.cost}</span></div>
+      <div style="margin-top:18px;">
+        <div class="lab" style="color:var(--muted);font-size:0.8rem;font-weight:600;margin-bottom:4px;">Worth asking</div>
+        <ul class="q-list">${data.questions.map(q=>`<li>${q}</li>`).join('')}</ul>
+      </div>
+    </div>
+  `;
+  addDiaryEntry('Translation', quote.slice(0,120));
+}
+
+loadVehicleForm();
+updateHeader();
+renderDashboard();
+</script>
+</body>
+</html>
