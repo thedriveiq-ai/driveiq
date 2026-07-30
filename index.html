@@ -167,22 +167,23 @@
   button.btn.ghost:hover{background:var(--bg);}
   button.btn:disabled{opacity:0.5;cursor:default;}
 
-  /* dashboard readout */
+  /* dashboard readout — a small dot carries the meaning, text stays calm and neutral */
   .readout-row{
     display:flex;justify-content:space-between;align-items:baseline;
     padding:12px 0;border-bottom:1px solid var(--line);
     font-size:0.92rem;
   }
   .readout-row:last-child{border-bottom:none;}
-  .readout-row .val{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:0.9rem;}
+  .readout-row .val{font-family:'IBM Plex Mono',monospace;font-weight:600;font-size:0.9rem;color:var(--navy);}
+  .readout-row .val::before{
+    content:'';display:inline-block;width:7px;height:7px;border-radius:50%;
+    margin-right:8px;background:var(--muted-2);vertical-align:middle;
+  }
   .card.hero .readout-row{border-color:rgba(255,255,255,0.1);}
-  .readout-row.warn .val{color:#F87171;}
-  .readout-row.ok .val{color:#34D399;}
-  .readout-row.soon .val{color:#FBBF24;}
-  .readout-row.warn .val, .readout-row.soon .val{color:var(--red);}
-  .card:not(.hero) .readout-row.ok .val{color:var(--emerald);}
-  .card:not(.hero) .readout-row.soon .val{color:var(--amber);}
-  .card:not(.hero) .readout-row.warn .val{color:var(--red);}
+  .card.hero .readout-row .val{color:#E2E8F0;}
+  .readout-row.ok .val::before{background:var(--emerald);}
+  .readout-row.soon .val::before{background:var(--amber);}
+  .readout-row.warn .val::before{background:var(--red);}
 
   .empty{
     text-align:center;padding:48px 20px;color:var(--muted);
@@ -207,18 +208,16 @@
   }
   .verdict{
     display:flex;align-items:center;gap:12px;
-    padding:16px 18px;border-radius:12px;font-weight:700;margin-bottom:20px;
-    font-size:1rem;
+    padding:14px 18px;border-radius:12px;font-weight:600;margin-bottom:20px;
+    font-size:0.95rem;background:var(--bg);color:var(--navy);border:1px solid var(--line);
   }
   .verdict .icon{
-    width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;
+    width:9px;height:9px;border-radius:50%;flex-shrink:0;
   }
-  .verdict.yes{background:var(--emerald-soft);color:#047857;}
-  .verdict.yes .icon{background:var(--emerald);color:#fff;}
-  .verdict.no{background:var(--amber-soft);color:#B45309;}
-  .verdict.no .icon{background:var(--amber);color:#fff;}
-  .verdict.emergency{background:var(--red-soft);color:#B91C1C;}
-  .verdict.emergency .icon{background:var(--red);color:#fff;}
+  .verdict.yes .icon{background:var(--emerald);}
+  .verdict.no .icon{background:var(--amber);}
+  .verdict.emergency .icon{background:var(--red);}
+  .verdict.emergency{border-color:rgba(220,38,38,0.25);}
 
   .fault-row{margin-bottom:16px;}
   .fault-row .top{display:flex;justify-content:space-between;font-size:0.92rem;font-weight:600;color:var(--navy);margin-bottom:6px;}
@@ -248,9 +247,46 @@
   .loading{color:var(--muted);font-size:0.92rem;}
   .loading::after{content:'…';animation:dots 1.2s steps(4,end) infinite;}
   @keyframes dots{0%,20%{content:'.'}40%{content:'..'}60%,100%{content:'...'}}
+
+  /* welcome / signup gate */
+  .welcome-overlay{
+    position:fixed;inset:0;background:rgba(15,23,42,0.55);
+    display:flex;align-items:center;justify-content:center;z-index:100;
+    padding:20px;
+  }
+  .welcome-card{
+    background:var(--white);border-radius:20px;padding:36px 32px;
+    max-width:400px;width:100%;box-shadow:0 20px 50px rgba(15,23,42,0.25);
+  }
+  .welcome-card h1{font-size:1.4rem;margin-bottom:10px;}
+  .welcome-card p.lead{margin-bottom:22px;font-size:0.92rem;}
+  .welcome-card .btn{width:100%;text-align:center;}
+  .welcome-fineprint{font-size:0.76rem;color:var(--muted-2);margin-top:14px;line-height:1.5;}
+  body.gated{overflow:hidden;}
 </style>
 </head>
 <body>
+
+<!-- Hidden static form so Netlify detects and provisions this form at build time -->
+<form name="signup" data-netlify="true" netlify-honeypot="bot-field" hidden>
+  <input type="text" name="name" />
+  <input type="email" name="email" />
+  <input type="text" name="bot-field" />
+</form>
+
+<div class="welcome-overlay" id="welcome-overlay">
+  <div class="welcome-card">
+    <span class="eyebrow">Welcome</span>
+    <h1>Let's get your car set up</h1>
+    <p class="lead">Just your name and email to get started on the free plan — we'll use it to save your car's details and let you know before your MOT or service is due.</p>
+    <label>Your name</label>
+    <input type="text" id="w-name" placeholder="Jane Smith">
+    <label>Email address</label>
+    <input type="email" id="w-email" placeholder="jane@email.com">
+    <button class="btn" onclick="completeWelcome()">Start free</button>
+    <div class="welcome-fineprint">We'll only email you about your car — no spam. You can delete your details any time.</div>
+  </div>
+</div>
 
 <header class="app-header">
   <div class="brand">
@@ -584,11 +620,6 @@ async function runDiagnosis(){
   addDiaryEntry('Diagnosis', payload.description);
 }
 
-function verdictIcon(kind){
-  if(kind==='yes') return '✓';
-  if(kind==='emergency') return '!';
-  return '•';
-}
 function renderDiagnosis(d){
   const el = document.getElementById('checker-result');
   const kind = d.safeToDrive === 'no' ? 'no' : d.safeToDrive === 'emergency' ? 'emergency' : 'yes';
@@ -597,7 +628,7 @@ function renderDiagnosis(d){
                       "This looks safe to drive, with a bit of care";
   el.innerHTML = `
     <div class="result-panel">
-      <div class="verdict ${kind}"><span class="icon">${verdictIcon(kind)}</span><span>${bannerText}</span></div>
+      <div class="verdict ${kind}"><span class="icon"></span><span>${bannerText}</span></div>
       ${d.likelihood.map(f=>`
         <div class="fault-row">
           <div class="top"><span>${f.fault}</span><span class="pct">${f.confidence}%</span></div>
@@ -673,6 +704,42 @@ async function runTranslate(){
   addDiaryEntry('Translation', quote.slice(0,120));
 }
 
+// ---------- Welcome / signup gate ----------
+const USER_KEY = 'driveiq_user_v1';
+function getUser(){
+  try{ return JSON.parse(localStorage.getItem(USER_KEY)); }catch(e){ return null; }
+}
+function encodeForm(data){
+  return Object.keys(data).map(k => encodeURIComponent(k)+'='+encodeURIComponent(data[k])).join('&');
+}
+async function completeWelcome(){
+  const name = document.getElementById('w-name').value.trim();
+  const email = document.getElementById('w-email').value.trim();
+  if(!name || !email || !email.includes('@')){
+    alert('Please pop in your name and a valid email to continue.');
+    return;
+  }
+  localStorage.setItem(USER_KEY, JSON.stringify({ name, email }));
+  document.getElementById('welcome-overlay').style.display = 'none';
+  document.body.classList.remove('gated');
+  try{
+    await fetch('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: encodeForm({ 'form-name': 'signup', name, email })
+    });
+  }catch(e){ /* non-fatal — the person can still use the app even if this fails */ }
+}
+function initWelcomeGate(){
+  const user = getUser();
+  if(user){
+    document.getElementById('welcome-overlay').style.display = 'none';
+  } else {
+    document.body.classList.add('gated');
+  }
+}
+
+initWelcomeGate();
 loadVehicleForm();
 updateHeader();
 renderDashboard();
