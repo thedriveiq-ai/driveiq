@@ -1,6 +1,10 @@
-# DriveIQ — AI Car Companion (Phase 1 MVP)
+# SafVia — AI Car Companion (Phase 1 MVP)
 
-A single-vehicle AI car companion app: symptom checker, garage-jargon translator, MOT/service reminders, and a diary. Built as a static site + one Netlify Function, so it costs almost nothing to run and takes about 10 minutes to deploy.
+A single-vehicle AI car companion app, formerly built under the working name "DriveIQ": symptom checker, garage-jargon translator, MOT/service reminders, and a diary. Built as a static site + one Netlify Function, so it costs almost nothing to run and takes about 10 minutes to deploy.
+
+## Lead capture (name + email)
+
+Before using any tool, a person is asked for their name and email once. This is stored in their browser so they're not asked again, and it's also submitted to **Netlify Forms** — a free, built-in Netlify feature that needs no extra setup. To see submissions: in Netlify, go to **Forms** in the left sidebar → click **"signup"** → you'll see every name/email as a spreadsheet-style list you can export as CSV. This is your starting database for the free tier; move to a proper database (Supabase) once you're validating Premium and need to log people in across devices.
 
 ## What's in Phase 1
 
@@ -17,7 +21,7 @@ Works even without the AI backend connected (each tool falls back to a sensible 
 - **Feel**: calm, premium, confident — Apple/Monzo/Notion/Tesla, not mechanic or petrolhead. No mascot.
 - **Colours**: Navy `#0F172A` (trust), Electric Blue `#2563EB` (AI/innovation), Emerald `#10B981` (safe/success), Amber `#F59E0B` (needs attention), Red `#DC2626` (stop/critical), Off White `#F8FAFC` (background).
 - **Type**: Manrope for headings, Inter for body copy, IBM Plex Mono for numbers (mileage, costs, valuations).
-- **Logo**: minimal one-line wordmark with a road-to-horizon mark — no steering wheels, spanners, or car icons.
+- **Logo**: minimal one-line wordmark with an S flowing into a winding road — no steering wheels, spanners, or car icons.
 - **Voice**: never technical, never condescending — explain it the way you'd explain it to your favourite aunt. The AI backend is prompted to follow this directly, so diagnoses come back in plain English rather than jargon.
 
 ## Deploy in 10 minutes
