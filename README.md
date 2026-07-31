@@ -66,6 +66,7 @@ Symptom checker, one vehicle, MOT/service reminders, diary, dashboard. Ship this
 
 ## Notes on this build
 
+Form detection enabled.
 - No framework, no build step — plain HTML/CSS/JS, so it deploys anywhere static hosting works (Netlify, Vercel, Cloudflare Pages).
 - Vehicle and diary data are stored in the browser's `localStorage` for Phase 1 — fine for a single-device MVP, but plan to move to Supabase (same stack as your other apps) once you add accounts, multi-device sync, or Stripe billing in Phase 2.
 - The AI function has an offline fallback built in on purpose, so the demo never looks broken to an investor or early user even before the API key is wired up.
