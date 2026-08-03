@@ -718,6 +718,12 @@ const STORAGE_KEY = 'driveiq_vehicle_v1';
 const DIARY_KEY = 'driveiq_diary_v1';
 const AI_ENDPOINT = '/.netlify/functions/ai-diagnose';
 
+// In-memory caches: default to whatever's in this browser (offline/logged-out state).
+// Once someone logs in, these get overwritten with — or merged into — their account data.
+let vehicleCache = (function(){ try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)); }catch(e){ return null; } })();
+let diaryCache = (function(){ try{ return JSON.parse(localStorage.getItem(DIARY_KEY)) || []; }catch(e){ return []; } })();
+let serviceHistoryCache = []; // populated below once SERVICE_HISTORY_KEY is defined further down; see init at bottom of file
+
 function switchTab(tab){
   document.querySelectorAll('nav.tabs button').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
@@ -744,9 +750,9 @@ function selectedChip(group){
 }
 
 function getVehicle(){
-  try{ return JSON.parse(localStorage.getItem(STORAGE_KEY)); }catch(e){ return null; }
+  return vehicleCache;
 }
-function saveVehicle(){
+async function saveVehicle(){
   const v = {
     reg: document.getElementById('v-reg').value,
     model: document.getElementById('v-model').value,
@@ -755,10 +761,20 @@ function saveVehicle(){
     mot: document.getElementById('v-mot').value,
     service: document.getElementById('v-service').value
   };
+  vehicleCache = v;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(v));
   document.getElementById('vehicle-saved-msg').style.display='inline';
   setTimeout(()=>document.getElementById('vehicle-saved-msg').style.display='none', 2000);
   updateHeader();
+  if(currentUser){
+    try{
+      await sb.from('vehicles').upsert({
+        user_id: currentUser.id,
+        reg: v.reg, model: v.model, year: v.year, mileage: v.mileage,
+        mot_date: v.mot || null, service_date: v.service || null
+      }, { onConflict: 'user_id' });
+    }catch(e){ /* saved locally regardless — will retry syncing on next save */ }
+  }
 }
 function loadVehicleForm(){
   const v = getVehicle();
@@ -810,12 +826,16 @@ function renderDashboard(){
 }
 
 function getDiary(){
-  try{ return JSON.parse(localStorage.getItem(DIARY_KEY)) || []; }catch(e){ return []; }
+  return diaryCache;
 }
 function addDiaryEntry(type, summary){
-  const d = getDiary();
-  d.unshift({ type, summary, when: new Date().toLocaleString('en-GB') });
-  localStorage.setItem(DIARY_KEY, JSON.stringify(d.slice(0,50)));
+  const entry = { type, summary, when: new Date().toLocaleString('en-GB') };
+  diaryCache.unshift(entry);
+  diaryCache = diaryCache.slice(0,50);
+  localStorage.setItem(DIARY_KEY, JSON.stringify(diaryCache));
+  if(currentUser){
+    sb.from('diary_entries').insert({ user_id: currentUser.id, type, summary }).then(()=>{}, ()=>{});
+  }
 }
 function renderDiary(){
   const d = getDiary();
@@ -1033,6 +1053,7 @@ function localScanFallback(){
 // ---------- Receipt scanner / service history ----------
 let receiptImageData = null;
 const SERVICE_HISTORY_KEY = 'driveiq_service_history_v1';
+try{ serviceHistoryCache = JSON.parse(localStorage.getItem(SERVICE_HISTORY_KEY)) || []; }catch(e){ serviceHistoryCache = []; }
 
 function previewReceiptPhoto(){
   const file = document.getElementById('r-photo').files[0];
@@ -1110,15 +1131,22 @@ function renderReceiptResult(data){
 }
 
 function getServiceHistory(){
-  try{ return JSON.parse(localStorage.getItem(SERVICE_HISTORY_KEY)) || []; }catch(e){ return []; }
+  return serviceHistoryCache;
 }
 function saveServiceHistoryEntry(data){
-  const list = getServiceHistory();
-  list.unshift({
+  const entry = {
     garage: data.garage || '', date: data.date || '', mileage: data.mileage || '',
     cost: data.cost || '', workDone: data.workDone || '', loggedAt: new Date().toLocaleDateString('en-GB')
-  });
-  localStorage.setItem(SERVICE_HISTORY_KEY, JSON.stringify(list.slice(0,100)));
+  };
+  serviceHistoryCache.unshift(entry);
+  serviceHistoryCache = serviceHistoryCache.slice(0,100);
+  localStorage.setItem(SERVICE_HISTORY_KEY, JSON.stringify(serviceHistoryCache));
+  if(currentUser){
+    sb.from('service_history').insert({
+      user_id: currentUser.id, garage: entry.garage, service_date: entry.date,
+      mileage: entry.mileage, cost: entry.cost, work_done: entry.workDone
+    }).then(()=>{}, ()=>{});
+  }
 }
 function renderServiceHistory(){
   const list = getServiceHistory();
@@ -1265,6 +1293,62 @@ async function handleSignedIn(user){
     await sb.from('profiles').update({ name: pendingName }).eq('id', user.id);
     localStorage.removeItem('safvia_pending_name');
   }
+
+  await loadAccountData();
+}
+
+async function loadAccountData(){
+  if(!currentUser) return;
+
+  // Vehicle: if this account already has one saved (e.g. logging in on a new device),
+  // that's the source of truth. If not, but this browser has a locally-saved vehicle
+  // (e.g. they used the app before signing up), migrate that local one up to their account.
+  try{
+    const { data: vRows } = await sb.from('vehicles').select('*').eq('user_id', currentUser.id).limit(1);
+    if(vRows && vRows.length > 0){
+      const row = vRows[0];
+      vehicleCache = {
+        reg: row.reg||'', model: row.model||'', year: row.year||'',
+        mileage: row.mileage||'', mot: row.mot_date||'', service: row.service_date||''
+      };
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(vehicleCache));
+    } else if(vehicleCache){
+      // No account vehicle yet, but a local one exists — upload it now.
+      await sb.from('vehicles').upsert({
+        user_id: currentUser.id, reg: vehicleCache.reg, model: vehicleCache.model,
+        year: vehicleCache.year, mileage: vehicleCache.mileage,
+        mot_date: vehicleCache.mot || null, service_date: vehicleCache.service || null
+      }, { onConflict: 'user_id' });
+    }
+  }catch(e){ /* keep whatever's cached locally if this fails */ }
+
+  // Diary
+  try{
+    const { data: dRows } = await sb.from('diary_entries').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false }).limit(50);
+    if(dRows){
+      diaryCache = dRows.map(r => ({ type: r.type, summary: r.summary, when: new Date(r.created_at).toLocaleString('en-GB') }));
+      localStorage.setItem(DIARY_KEY, JSON.stringify(diaryCache));
+    }
+  }catch(e){ /* keep local diary if this fails */ }
+
+  // Service history
+  try{
+    const { data: sRows } = await sb.from('service_history').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false }).limit(100);
+    if(sRows){
+      serviceHistoryCache = sRows.map(r => ({
+        garage: r.garage||'', date: r.service_date||'', mileage: r.mileage||'',
+        cost: r.cost||'', workDone: r.work_done||'', loggedAt: new Date(r.created_at).toLocaleDateString('en-GB')
+      }));
+      localStorage.setItem(SERVICE_HISTORY_KEY, JSON.stringify(serviceHistoryCache));
+    }
+  }catch(e){ /* keep local service history if this fails */ }
+
+  // Refresh whatever's currently on screen with the account's real data
+  loadVehicleForm();
+  updateHeader();
+  renderDashboard();
+  renderDiary();
+  renderServiceHistory();
 }
 
 function initWelcomeGate(){
