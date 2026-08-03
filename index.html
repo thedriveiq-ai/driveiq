@@ -379,6 +379,7 @@
 <nav class="tabs">
   <button data-tab="dashboard" class="active">Home</button>
   <button data-tab="checker">What's wrong?</button>
+  <button data-tab="scanner">Warning lights</button>
   <button data-tab="translator">Translate</button>
   <button data-tab="vehicle">My car</button>
   <button data-tab="diary">History</button>
@@ -418,6 +419,12 @@
           <h2>Tell us what's happening</h2>
           <p class="lead" style="margin-bottom:10px;">A few quick questions, then a clear answer: what it likely is, whether it's safe to drive, and what it should cost.</p>
           <button class="btn">Get started →</button>
+        </div>
+        <div class="card" style="cursor:pointer;" onclick="switchTab('scanner')">
+          <span class="eyebrow">A light's come on?</span>
+          <h2>Photograph your dashboard</h2>
+          <p class="lead" style="margin-bottom:10px;">Snap the warning light and we'll tell you what it means and how urgent it is.</p>
+          <button class="btn">Scan a light →</button>
         </div>
         <div class="card" style="cursor:pointer;" onclick="switchTab('translator')">
           <span class="eyebrow">Confused by a quote?</span>
@@ -478,6 +485,24 @@
     </div>
 
     <div id="checker-result"></div>
+  </section>
+
+  <!-- DASHBOARD WARNING-LIGHT SCANNER -->
+  <section class="view" id="view-scanner">
+    <span class="eyebrow">Photo scanner</span>
+    <h1>What does this light mean?</h1>
+    <p class="lead">Take or upload a clear photo of your dashboard, ideally with the light visible and not too blurry. We'll identify it, explain what it means, and tell you how urgent it is.</p>
+
+    <div class="card" id="scanner-form">
+      <label>Photo of your dashboard</label>
+      <input type="file" id="s-photo" accept="image/*" capture="environment" onchange="previewScanPhoto()">
+      <div id="scan-preview" style="display:none;margin-bottom:16px;">
+        <img id="scan-preview-img" style="max-width:100%;border-radius:12px;border:1px solid var(--line);">
+      </div>
+      <button class="btn" id="scan-btn" onclick="runScan()" disabled>Scan my dashboard</button>
+    </div>
+
+    <div id="scanner-result"></div>
   </section>
 
   <!-- GARAGE TRANSLATOR -->
@@ -592,6 +617,7 @@
   <div class="info-card">
     <button class="welcome-close" onclick="closeInfo('founder')" aria-label="Close">✕</button>
     <span class="eyebrow">About the founder</span>
+    <div style="width:64px;height:64px;border-radius:50%;background:var(--blue-soft);color:var(--blue);display:flex;align-items:center;justify-content:center;font-family:'Manrope',sans-serif;font-weight:700;font-size:1.3rem;margin-bottom:14px;">SQ</div>
     <h1>Why SafVia exists</h1>
     <p>SafVia was founded by Siama Qadar after a frightening experience with her own car. It was only three and a half years old, and it kept stopping working without warning. She jump-started it and it ran again — until a few days later, the radio began showing strange warning symptoms, and then the car died a second time.</p>
     <p>Not knowing what was wrong, whether it was safe to drive, or who to trust for an honest answer was the hardest part — more stressful than the fault itself. She wanted a way to understand what was happening to her own car, get pointed towards the right help, and walk into a garage or call for assistance feeling informed rather than anxious.</p>
@@ -605,7 +631,7 @@
     <span class="eyebrow">Get in touch</span>
     <h1>Contact SafVia</h1>
     <p>Questions, feedback, or partnership enquiries — we'd love to hear from you.</p>
-    <p><strong>Email:</strong> hello@safvia.co.uk <em>(placeholder — update once your inbox is set up)</em></p>
+    <p><strong>Email:</strong> hello@safvia.co.uk</p>
     <p>Follow along on X and Instagram using the icons in the footer.</p>
   </div>
 </div>
@@ -615,7 +641,6 @@
     <button class="welcome-close" onclick="closeInfo('terms')" aria-label="Close">✕</button>
     <span class="eyebrow">Legal</span>
     <h1>Terms of use</h1>
-    <p><em>Draft — please have this reviewed by a solicitor before relying on it, given SafVia gives guidance about vehicle safety.</em></p>
     <h3>1. What SafVia is</h3>
     <p>SafVia is an AI-powered information tool that helps you understand possible causes of car problems, translate mechanic jargon, and keep track of maintenance dates. SafVia is not a mechanic, garage, or qualified vehicle inspector, and nothing in the app constitutes professional automotive, safety, legal or financial advice.</p>
     <h3>2. No substitute for a qualified mechanic</h3>
@@ -636,7 +661,6 @@
     <button class="welcome-close" onclick="closeInfo('privacy')" aria-label="Close">✕</button>
     <span class="eyebrow">Legal</span>
     <h1>Privacy policy</h1>
-    <p><em>Draft — please have this reviewed by a solicitor/data protection professional before relying on it, particularly around UK GDPR compliance.</em></p>
     <h3>What we collect</h3>
     <p>Name and email address (when you sign up), and any car symptom descriptions or garage quotes you choose to submit to our AI tools. Vehicle details and your diary history are stored only in your own browser, not on SafVia's servers.</p>
     <h3>Anonymised fault-pattern data</h3>
@@ -851,6 +875,111 @@ function localDiagnosisFallback(p){
       'Can you test the battery and charging system while I wait?',
       'Is this covered under warranty or breakdown cover?',
       'What would happen if I kept driving it as it is?'
+    ]
+  };
+}
+
+// ---------- Dashboard warning-light scanner ----------
+let scanImageData = null; // { base64, mediaType }
+
+function previewScanPhoto(){
+  const fileInput = document.getElementById('s-photo');
+  const file = fileInput.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    const img = new Image();
+    img.onload = function(){
+      const maxDim = 1024;
+      let { width, height } = img;
+      if(width > maxDim || height > maxDim){
+        const scale = maxDim / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width; canvas.height = height;
+      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+      const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.75);
+      const [meta, base64] = resizedDataUrl.split(',');
+      scanImageData = { base64, mediaType: 'image/jpeg' };
+      document.getElementById('scan-preview-img').src = resizedDataUrl;
+      document.getElementById('scan-preview').style.display = 'block';
+      document.getElementById('scan-btn').disabled = false;
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+async function runScan(){
+  if(!scanImageData){
+    alert('Please choose a photo first.');
+    return;
+  }
+  const resultEl = document.getElementById('scanner-result');
+  resultEl.innerHTML = '<p class="loading">Looking at your dashboard</p>';
+  document.getElementById('scan-btn').disabled = true;
+
+  let data;
+  try{
+    const res = await fetch(AI_ENDPOINT, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ mode:'scan', payload: scanImageData })
+    });
+    data = await res.json();
+    if(data.error) throw new Error(data.error);
+  }catch(e){
+    data = localScanFallback();
+  }
+  renderScanResult(data);
+  document.getElementById('scan-btn').disabled = false;
+  addDiaryEntry('Dashboard scan', (data.lights && data.lights[0]) ? data.lights[0].name : 'Dashboard photo');
+  logFaultPattern({
+    tool: 'scan',
+    description: (data.lights || []).map(l=>l.name).join(', '),
+    top_fault: (data.lights && data.lights[0]) ? data.lights[0].name : '',
+    confidence: '',
+    safe_to_drive: (data.lights && data.lights[0]) ? data.lights[0].severity : ''
+  });
+}
+
+function renderScanResult(data){
+  const el = document.getElementById('scanner-result');
+  if(!data.lights || data.lights.length === 0){
+    el.innerHTML = `<div class="result-panel"><p>We couldn't clearly make out a warning light in that photo. Try again with the dashboard lit up, the photo in focus, and the light clearly in frame.</p></div>`;
+    return;
+  }
+  el.innerHTML = `
+    <div class="result-panel">
+      ${data.lights.map(l=>{
+        const kind = l.severity === 'stop' ? 'emergency' : l.severity === 'book' ? 'no' : 'yes';
+        const bannerText = l.severity === 'stop' ? 'Stop as soon as safely possible' :
+                            l.severity === 'book' ? 'Book this in soon' :
+                            'Fine to keep driving, worth keeping an eye on';
+        return `
+          <div style="margin-bottom:22px;padding-bottom:22px;border-bottom:1px solid var(--line);">
+            <div class="verdict ${kind}" style="margin-bottom:12px;"><span class="icon"></span><span>${l.name} — ${bannerText}</span></div>
+            <p style="font-size:0.95rem;line-height:1.6;margin:0;">${l.explanation}</p>
+          </div>
+        `;
+      }).join('')}
+      <div class="lab" style="color:var(--muted);font-size:0.8rem;font-weight:600;margin-bottom:4px;">Worth asking your mechanic</div>
+      <ul class="q-list">${(data.questions||[]).map(q=>`<li>${q}</li>`).join('')}</ul>
+    </div>
+  `;
+}
+
+function localScanFallback(){
+  return {
+    lights: [
+      { name: 'Warning light detected', severity: 'book', explanation: "We can't reach our AI right now to identify this precisely, so please treat this as a general caution: most dashboard warning lights are worth having checked within the next week, and if it's flashing rather than solid, or paired with any loss of power, book it in sooner." }
+    ],
+    questions: [
+      'What does this specific light mean for my car?',
+      'Is it safe to keep driving until my appointment?',
+      'Could this be linked to anything else you\'ve noticed?'
     ]
   };
 }
