@@ -380,6 +380,7 @@
   <button data-tab="dashboard" class="active">Home</button>
   <button data-tab="checker">What's wrong?</button>
   <button data-tab="scanner">Warning lights</button>
+  <button data-tab="receipts">Receipts</button>
   <button data-tab="translator">Translate</button>
   <button data-tab="vehicle">My car</button>
   <button data-tab="diary">History</button>
@@ -425,6 +426,12 @@
           <h2>Photograph your dashboard</h2>
           <p class="lead" style="margin-bottom:10px;">Snap the warning light and we'll tell you what it means and how urgent it is.</p>
           <button class="btn">Scan a light →</button>
+        </div>
+        <div class="card" style="cursor:pointer;" onclick="switchTab('receipts')">
+          <span class="eyebrow">Just had work done?</span>
+          <h2>Photograph the receipt</h2>
+          <p class="lead" style="margin-bottom:10px;">We'll read it and keep your service history in one place, automatically.</p>
+          <button class="btn">Log a receipt →</button>
         </div>
         <div class="card" style="cursor:pointer;" onclick="switchTab('translator')">
           <span class="eyebrow">Confused by a quote?</span>
@@ -503,6 +510,27 @@
     </div>
 
     <div id="scanner-result"></div>
+  </section>
+
+  <!-- RECEIPT SCANNER / SERVICE HISTORY -->
+  <section class="view" id="view-receipts">
+    <span class="eyebrow">Service history</span>
+    <h1>Keep every receipt in one place</h1>
+    <p class="lead">Photograph an invoice or receipt and we'll read it automatically — no typing needed. It builds into your car's full service history over time.</p>
+
+    <div class="card" id="receipt-form">
+      <label>Photo of the receipt or invoice</label>
+      <input type="file" id="r-photo" accept="image/*" capture="environment" onchange="previewReceiptPhoto()">
+      <div id="receipt-preview" style="display:none;margin-bottom:16px;">
+        <img id="receipt-preview-img" style="max-width:100%;border-radius:12px;border:1px solid var(--line);">
+      </div>
+      <button class="btn" id="receipt-btn" onclick="runReceiptScan()" disabled>Read my receipt</button>
+    </div>
+
+    <div id="receipt-result"></div>
+
+    <h2 style="margin-top:32px;">Your service history</h2>
+    <div id="service-history-list"></div>
   </section>
 
   <!-- GARAGE TRANSLATOR -->
@@ -687,6 +715,7 @@ function switchTab(tab){
   document.getElementById('view-'+tab).classList.add('active');
   if(tab==='dashboard') renderDashboard();
   if(tab==='diary') renderDiary();
+  if(tab==='receipts') renderServiceHistory();
 }
 document.querySelectorAll('nav.tabs button').forEach(b=>{
   b.addEventListener('click', ()=>switchTab(b.dataset.tab));
@@ -880,36 +909,44 @@ function localDiagnosisFallback(p){
 }
 
 // ---------- Dashboard warning-light scanner ----------
+// ---------- Shared: resize a photo client-side before sending to the AI ----------
+function resizeImageFile(file, maxDim, quality){
+  return new Promise((resolve)=>{
+    const reader = new FileReader();
+    reader.onload = function(e){
+      const img = new Image();
+      img.onload = function(){
+        let { width, height } = img;
+        if(width > maxDim || height > maxDim){
+          const scale = maxDim / Math.max(width, height);
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        const [, base64] = dataUrl.split(',');
+        resolve({ base64, mediaType: 'image/jpeg', dataUrl });
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// ---------- Dashboard warning-light scanner ----------
 let scanImageData = null; // { base64, mediaType }
 
 function previewScanPhoto(){
-  const fileInput = document.getElementById('s-photo');
-  const file = fileInput.files[0];
+  const file = document.getElementById('s-photo').files[0];
   if(!file) return;
-  const reader = new FileReader();
-  reader.onload = function(e){
-    const img = new Image();
-    img.onload = function(){
-      const maxDim = 1024;
-      let { width, height } = img;
-      if(width > maxDim || height > maxDim){
-        const scale = maxDim / Math.max(width, height);
-        width = Math.round(width * scale);
-        height = Math.round(height * scale);
-      }
-      const canvas = document.createElement('canvas');
-      canvas.width = width; canvas.height = height;
-      canvas.getContext('2d').drawImage(img, 0, 0, width, height);
-      const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.75);
-      const [meta, base64] = resizedDataUrl.split(',');
-      scanImageData = { base64, mediaType: 'image/jpeg' };
-      document.getElementById('scan-preview-img').src = resizedDataUrl;
-      document.getElementById('scan-preview').style.display = 'block';
-      document.getElementById('scan-btn').disabled = false;
-    };
-    img.src = e.target.result;
-  };
-  reader.readAsDataURL(file);
+  resizeImageFile(file, 1024, 0.75).then(result=>{
+    scanImageData = { base64: result.base64, mediaType: result.mediaType };
+    document.getElementById('scan-preview-img').src = result.dataUrl;
+    document.getElementById('scan-preview').style.display = 'block';
+    document.getElementById('scan-btn').disabled = false;
+  });
 }
 
 async function runScan(){
@@ -982,6 +1019,111 @@ function localScanFallback(){
       'Could this be linked to anything else you\'ve noticed?'
     ]
   };
+}
+
+// ---------- Receipt scanner / service history ----------
+let receiptImageData = null;
+const SERVICE_HISTORY_KEY = 'driveiq_service_history_v1';
+
+function previewReceiptPhoto(){
+  const file = document.getElementById('r-photo').files[0];
+  if(!file) return;
+  resizeImageFile(file, 1200, 0.78).then(result=>{
+    receiptImageData = { base64: result.base64, mediaType: result.mediaType };
+    document.getElementById('receipt-preview-img').src = result.dataUrl;
+    document.getElementById('receipt-preview').style.display = 'block';
+    document.getElementById('receipt-btn').disabled = false;
+  });
+}
+
+async function runReceiptScan(){
+  if(!receiptImageData){
+    alert('Please choose a photo first.');
+    return;
+  }
+  const resultEl = document.getElementById('receipt-result');
+  resultEl.innerHTML = '<p class="loading">Reading your receipt</p>';
+  document.getElementById('receipt-btn').disabled = true;
+
+  let data;
+  try{
+    const res = await fetch(AI_ENDPOINT, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ mode:'receipt', payload: receiptImageData })
+    });
+    data = await res.json();
+    if(data.error) throw new Error(data.error);
+  }catch(e){
+    data = { readable: false, garage:'', date:'', mileage:'', cost:'', workDone:'A summary of the work isn\'t available right now — our AI backend couldn\'t be reached.', advisories: [] };
+  }
+  renderReceiptResult(data);
+  document.getElementById('receipt-btn').disabled = false;
+
+  if(data.readable !== false){
+    saveServiceHistoryEntry(data);
+    addDiaryEntry('Receipt', data.workDone ? data.workDone.slice(0,120) : 'Receipt logged');
+    logFaultPattern({
+      tool: 'receipt',
+      description: data.workDone || '',
+      top_fault: '',
+      confidence: '',
+      safe_to_drive: ''
+    });
+  }
+}
+
+function renderReceiptResult(data){
+  const el = document.getElementById('receipt-result');
+  if(data.readable === false){
+    el.innerHTML = `<div class="result-panel"><p>We couldn't clearly read that receipt. Try again with better lighting and the text in focus, or make sure the whole receipt is in frame.</p></div>`;
+    return;
+  }
+  el.innerHTML = `
+    <div class="result-panel">
+      <span class="eyebrow">Logged to your service history</span>
+      <div class="readout-row"><span>Garage</span><span class="val" style="color:var(--navy);">${data.garage || '—'}</span></div>
+      <div class="readout-row"><span>Date</span><span class="val" style="color:var(--navy);">${data.date || '—'}</span></div>
+      <div class="readout-row"><span>Mileage</span><span class="val" style="color:var(--navy);">${data.mileage || '—'}</span></div>
+      <div class="readout-row"><span>Cost</span><span class="val" style="color:var(--navy);">${data.cost || '—'}</span></div>
+      <div style="margin-top:16px;">
+        <div class="lab" style="color:var(--muted);font-size:0.8rem;font-weight:600;margin-bottom:4px;">Work done</div>
+        <p style="font-size:0.95rem;line-height:1.6;margin:0;">${data.workDone || 'Not specified'}</p>
+      </div>
+      ${(data.advisories && data.advisories.length) ? `
+        <div style="margin-top:16px;">
+          <div class="lab" style="color:var(--muted);font-size:0.8rem;font-weight:600;margin-bottom:4px;">Worth keeping an eye on</div>
+          <ul class="q-list">${data.advisories.map(a=>`<li>${a}</li>`).join('')}</ul>
+        </div>
+      ` : ''}
+    </div>
+  `;
+}
+
+function getServiceHistory(){
+  try{ return JSON.parse(localStorage.getItem(SERVICE_HISTORY_KEY)) || []; }catch(e){ return []; }
+}
+function saveServiceHistoryEntry(data){
+  const list = getServiceHistory();
+  list.unshift({
+    garage: data.garage || '', date: data.date || '', mileage: data.mileage || '',
+    cost: data.cost || '', workDone: data.workDone || '', loggedAt: new Date().toLocaleDateString('en-GB')
+  });
+  localStorage.setItem(SERVICE_HISTORY_KEY, JSON.stringify(list.slice(0,100)));
+}
+function renderServiceHistory(){
+  const list = getServiceHistory();
+  const el = document.getElementById('service-history-list');
+  if(list.length === 0){
+    el.innerHTML = '<div class="empty">No receipts logged yet — photograph one above to get started.</div>';
+    return;
+  }
+  el.innerHTML = list.map(e=>`
+    <div class="diary-entry">
+      <div class="when">${e.date || e.loggedAt} ${e.garage ? '· '+e.garage : ''} ${e.mileage ? '· '+e.mileage+' mi' : ''} ${e.cost ? '<span class="badge">'+e.cost+'</span>' : ''}</div>
+      <div>${e.workDone}</div>
+    </div>
+  `).join('');
 }
 
 async function runTranslate(){
