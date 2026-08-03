@@ -768,12 +768,17 @@ async function saveVehicle(){
   updateHeader();
   if(currentUser){
     try{
-      await sb.from('vehicles').upsert({
+      const result = await sb.from('vehicles').upsert({
         user_id: currentUser.id,
         reg: v.reg, model: v.model, year: v.year, mileage: v.mileage,
         mot_date: v.mot || null, service_date: v.service || null
       }, { onConflict: 'user_id' });
-    }catch(e){ /* saved locally regardless — will retry syncing on next save */ }
+      if(result.error){
+        console.error('SafVia: vehicle save to account failed:', result.error);
+      } else {
+        console.log('SafVia: vehicle saved to account successfully');
+      }
+    }catch(e){ console.error('SafVia: vehicle save threw an error:', e); }
   }
 }
 function loadVehicleForm(){
