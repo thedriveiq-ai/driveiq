@@ -326,6 +326,8 @@
   .info-card h3{font-size:0.95rem;margin:20px 0 8px;}
   .info-card .welcome-close{position:absolute;top:16px;right:16px;}
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -352,15 +354,22 @@
 <div class="welcome-overlay" id="welcome-overlay" style="display:none;">
   <div class="welcome-card">
     <button class="welcome-close" onclick="closeWelcome()" aria-label="Close">✕</button>
-    <span class="eyebrow">Welcome</span>
-    <h1>Let's get your car set up</h1>
-    <p class="lead">Whenever you're ready — just your name and email to get started on the free plan. We'll use it to save your car's details and let you know before your MOT or service is due.</p>
-    <label>Your name</label>
-    <input type="text" id="w-name" placeholder="Jane Smith">
-    <label>Email address</label>
-    <input type="email" id="w-email" placeholder="jane@email.com">
-    <button class="btn" onclick="completeWelcome()">Start free</button>
-    <div class="welcome-fineprint">We'll only email you about your car — no spam. You can delete your details any time.</div>
+    <div id="welcome-step-form">
+      <span class="eyebrow">Welcome</span>
+      <h1>Let's get your car set up</h1>
+      <p class="lead">Whenever you're ready — just your name and email to create your free account. We'll email you a one-click login link, no password needed.</p>
+      <label>Your name</label>
+      <input type="text" id="w-name" placeholder="Jane Smith">
+      <label>Email address</label>
+      <input type="email" id="w-email" placeholder="jane@email.com">
+      <button class="btn" onclick="completeWelcome()">Send my login link</button>
+      <div class="welcome-fineprint">We'll only email you about your car — no spam. You can delete your account any time.</div>
+    </div>
+    <div id="welcome-step-sent" style="display:none;">
+      <span class="eyebrow">Check your email</span>
+      <h1>Almost there</h1>
+      <p class="lead">We've sent a login link to your email. Click it on this device to finish setting up your account — no password to remember.</p>
+    </div>
   </div>
 </div>
 
@@ -1171,18 +1180,19 @@ async function runTranslate(){
   });
 }
 
-// ---------- Welcome / signup gate ----------
-const USER_KEY = 'driveiq_user_v1';
-function getUser(){
-  try{ return JSON.parse(localStorage.getItem(USER_KEY)); }catch(e){ return null; }
-}
+// ---------- Supabase client + real accounts ----------
+const SUPABASE_URL = 'https://xihflmpmdnaeclgzsqvm.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_m7PpsJzsisW68v9YxlhmSw__eYlbWx8';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let currentUser = null; // set once someone is logged in
+
 function encodeForm(data){
   return Object.keys(data).map(k => encodeURIComponent(k)+'='+encodeURIComponent(data[k])).join('&');
 }
 async function logFaultPattern(entry){
   // Anonymised: no name or email attached — just vehicle make/model/year (if saved)
   // plus the symptom and the AI's result. This builds the fault-pattern dataset
-  // referenced in the long-term strategy, separately from the personal signup list.
+  // referenced in the long-term strategy, separately from any personal account data.
   const v = getVehicle();
   const make_model = v && v.model ? v.model : '';
   const year = v && v.year ? v.year : '';
@@ -1203,6 +1213,7 @@ async function logFaultPattern(entry){
     });
   }catch(e){ /* non-fatal — logging failure should never block the person's result */ }
 }
+
 async function completeWelcome(){
   const name = document.getElementById('w-name').value.trim();
   const email = document.getElementById('w-email').value.trim();
@@ -1210,25 +1221,31 @@ async function completeWelcome(){
     alert('Please pop in your name and a valid email to continue.');
     return;
   }
-  localStorage.setItem(USER_KEY, JSON.stringify({ name, email }));
-  document.getElementById('welcome-overlay').style.display = 'none';
-  document.getElementById('save-nudge').style.display = 'none';
-  try{
-    await fetch('/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      keepalive: true,
-      body: encodeForm({ 'form-name': 'signup', name, email })
-    });
-  }catch(e){ /* non-fatal — the person can still use the app even if this fails */ }
+  // Stash the name locally so we can attach it to their profile once they click the login link
+  localStorage.setItem('safvia_pending_name', name);
+  const { error } = await sb.auth.signInWithOtp({
+    email,
+    options: { emailRedirectTo: window.location.origin }
+  });
+  if(error){
+    alert("We couldn't send that login link — please check the email address and try again.");
+    return;
+  }
+  document.getElementById('welcome-step-form').style.display = 'none';
+  document.getElementById('welcome-step-sent').style.display = 'block';
 }
+
 function openWelcome(){
+  document.getElementById('welcome-step-form').style.display = 'block';
+  document.getElementById('welcome-step-sent').style.display = 'none';
   document.getElementById('welcome-overlay').style.display = 'flex';
 }
 function closeWelcome(){
   document.getElementById('welcome-overlay').style.display = 'none';
   sessionStorage.setItem('safvia_welcome_dismissed', '1');
-  document.getElementById('save-nudge').style.display = 'flex';
+  if(!currentUser){
+    document.getElementById('save-nudge').style.display = 'flex';
+  }
 }
 function openInfo(key){
   document.getElementById('info-'+key).style.display = 'flex';
@@ -1236,23 +1253,42 @@ function openInfo(key){
 function closeInfo(key){
   document.getElementById('info-'+key).style.display = 'none';
 }
+
+async function handleSignedIn(user){
+  currentUser = user;
+  document.getElementById('welcome-overlay').style.display = 'none';
+  document.getElementById('save-nudge').style.display = 'none';
+
+  // Apply a pending name (set just before the magic link was sent) to their profile
+  const pendingName = localStorage.getItem('safvia_pending_name');
+  if(pendingName){
+    await sb.from('profiles').update({ name: pendingName }).eq('id', user.id);
+    localStorage.removeItem('safvia_pending_name');
+  }
+}
+
 function initWelcomeGate(){
-  const user = getUser();
-  if(user){
-    return; // already signed up — never show either the popup or the nudge
-  }
-  // Not signed up yet: let them explore first. Show the popup after a short delay,
-  // unless they've already closed it once this session — in which case just show
-  // the small persistent nudge so they can add their details whenever they're ready.
-  if(sessionStorage.getItem('safvia_welcome_dismissed')){
-    document.getElementById('save-nudge').style.display = 'flex';
-    return;
-  }
-  setTimeout(()=>{
-    if(!getUser()){
-      document.getElementById('welcome-overlay').style.display = 'flex';
+  sb.auth.getSession().then(({ data }) => {
+    if(data.session){
+      handleSignedIn(data.session.user);
+    } else if(sessionStorage.getItem('safvia_welcome_dismissed')){
+      document.getElementById('save-nudge').style.display = 'flex';
+    } else {
+      setTimeout(()=>{
+        sb.auth.getSession().then(({ data }) => {
+          if(!data.session){
+            document.getElementById('welcome-overlay').style.display = 'flex';
+          }
+        });
+      }, 15000);
     }
-  }, 15000);
+  });
+
+  sb.auth.onAuthStateChange((event, session) => {
+    if(event === 'SIGNED_IN' && session){
+      handleSignedIn(session.user);
+    }
+  });
 }
 
 initWelcomeGate();
