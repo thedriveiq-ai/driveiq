@@ -336,6 +336,19 @@
   <input type="text" name="bot-field" />
 </form>
 
+<!-- Hidden static form for anonymised fault-pattern logging — no name/email attached,
+     just make/model/year + symptom + AI's result, to build the fault-pattern database. -->
+<form name="diagnosis-log" data-netlify="true" netlify-honeypot="bot-field" hidden>
+  <input type="text" name="make_model" />
+  <input type="text" name="year" />
+  <input type="text" name="description" />
+  <input type="text" name="top_fault" />
+  <input type="text" name="confidence" />
+  <input type="text" name="safe_to_drive" />
+  <input type="text" name="tool" />
+  <input type="text" name="bot-field" />
+</form>
+
 <div class="welcome-overlay" id="welcome-overlay" style="display:none;">
   <div class="welcome-card">
     <button class="welcome-close" onclick="closeWelcome()" aria-label="Close">✕</button>
@@ -626,6 +639,8 @@
     <p><em>Draft — please have this reviewed by a solicitor/data protection professional before relying on it, particularly around UK GDPR compliance.</em></p>
     <h3>What we collect</h3>
     <p>Name and email address (when you sign up), and any car symptom descriptions or garage quotes you choose to submit to our AI tools. Vehicle details and your diary history are stored only in your own browser, not on SafVia's servers.</p>
+    <h3>Anonymised fault-pattern data</h3>
+    <p>Separately from your name and email, we log an anonymised record of each symptom check and garage translation — your vehicle's make, model and year (if saved), the symptom described, and the AI's assessment. This is not linked to your name, email, or any other identifying information, and is used to identify patterns in vehicle faults across makes and models, to improve SafVia's guidance over time, and potentially to inform partnerships with manufacturers, insurers or breakdown providers in aggregate, non-identifying form.</p>
     <h3>Why we collect it</h3>
     <p>To operate the free plan, send you reminders about your car (MOT, servicing), and to generate AI guidance in response to what you type.</p>
     <h3>Who we share it with</h3>
@@ -785,6 +800,13 @@ async function runDiagnosis(){
   }
   renderDiagnosis(data);
   addDiaryEntry('Diagnosis', payload.description);
+  logFaultPattern({
+    tool: 'diagnose',
+    description: payload.description,
+    top_fault: (data.likelihood && data.likelihood[0]) ? data.likelihood[0].fault : '',
+    confidence: (data.likelihood && data.likelihood[0]) ? data.likelihood[0].confidence : '',
+    safe_to_drive: data.safeToDrive || ''
+  });
 }
 
 function renderDiagnosis(d){
@@ -869,6 +891,13 @@ async function runTranslate(){
     </div>
   `;
   addDiaryEntry('Translation', quote.slice(0,120));
+  logFaultPattern({
+    tool: 'translate',
+    description: quote.slice(0,200),
+    top_fault: '',
+    confidence: '',
+    safe_to_drive: data.urgency || ''
+  });
 }
 
 // ---------- Welcome / signup gate ----------
@@ -878,6 +907,30 @@ function getUser(){
 }
 function encodeForm(data){
   return Object.keys(data).map(k => encodeURIComponent(k)+'='+encodeURIComponent(data[k])).join('&');
+}
+async function logFaultPattern(entry){
+  // Anonymised: no name or email attached — just vehicle make/model/year (if saved)
+  // plus the symptom and the AI's result. This builds the fault-pattern dataset
+  // referenced in the long-term strategy, separately from the personal signup list.
+  const v = getVehicle();
+  const make_model = v && v.model ? v.model : '';
+  const year = v && v.year ? v.year : '';
+  try{
+    await fetch('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      keepalive: true,
+      body: encodeForm({
+        'form-name': 'diagnosis-log',
+        make_model, year,
+        description: entry.description || '',
+        top_fault: entry.top_fault || '',
+        confidence: String(entry.confidence || ''),
+        safe_to_drive: entry.safe_to_drive || '',
+        tool: entry.tool || ''
+      })
+    });
+  }catch(e){ /* non-fatal — logging failure should never block the person's result */ }
 }
 async function completeWelcome(){
   const name = document.getElementById('w-name').value.trim();
