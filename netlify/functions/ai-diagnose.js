@@ -1,5 +1,6 @@
 // Netlify Function: ai-diagnose
-// Handles two modes: "diagnose" (symptom checker) and "translate" (garage quote translator)
+// Handles three modes: "diagnose" (symptom checker), "translate" (garage quote translator),
+// and "scan" (dashboard warning-light photo scanner).
 // Requires an ANTHROPIC_API_KEY environment variable set in Netlify site settings.
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -24,9 +25,21 @@ exports.handler = async function (event) {
 
   const { mode, payload } = body;
 
-  const prompt = mode === 'translate'
-    ? buildTranslatePrompt(payload)
-    : buildDiagnosePrompt(payload);
+  let messageContent;
+  if (mode === 'scan') {
+    if (!payload || !payload.base64 || !payload.mediaType) {
+      return { statusCode: 200, body: JSON.stringify({ error: 'No image received' }) };
+    }
+    messageContent = [
+      { type: 'image', source: { type: 'base64', media_type: payload.mediaType, data: payload.base64 } },
+      { type: 'text', text: buildScanPrompt() }
+    ];
+  } else {
+    const prompt = mode === 'translate'
+      ? buildTranslatePrompt(payload)
+      : buildDiagnosePrompt(payload);
+    messageContent = prompt;
+  }
 
   try {
     const res = await fetch(ANTHROPIC_URL, {
@@ -38,8 +51,8 @@ exports.handler = async function (event) {
       },
       body: JSON.stringify({
         model: MODEL,
-        max_tokens: 800,
-        messages: [{ role: 'user', content: prompt }]
+        max_tokens: 1000,
+        messages: [{ role: 'user', content: messageContent }]
       })
     });
 
@@ -92,4 +105,26 @@ Return JSON with this exact shape:
   "cost": "£X–£Y" (realistic UK repair cost range for this specific job),
   "questions": [ 3 short, plain-English questions the driver should ask the garage ]
 }`;
+}
+
+function buildScanPrompt() {
+  return `You are SafVia, looking at a photo of a UK driver's car dashboard on their behalf. ${VOICE_INSTRUCTION}
+
+Identify every warning light or dashboard indicator visible in the photo that is currently lit (ignore icons that are just part of the normal display, like a fuel gauge needle or speedometer numbers — only report lights that are illuminated/highlighted, e.g. amber or red icons).
+
+If the photo is too blurry, dark, or doesn't clearly show a dashboard, say so honestly rather than guessing.
+
+Respond with ONLY a JSON object, no preamble, no markdown fences, in this exact shape:
+{
+  "lights": [
+    {
+      "name": "plain-English name of the light, e.g. 'Engine warning light'",
+      "severity": "stop" | "book" | "ok",
+      "explanation": "2-3 warm, plain-English sentences: what this light means, roughly why it comes on, and what it means for driving right now — no unexplained jargon"
+    }
+  ],
+  "questions": [ 3 short, plain-English questions the driver should ask their mechanic about what was found ]
+}
+
+Use "stop" only for lights that mean serious immediate danger (e.g. oil pressure warning, brake system failure, engine overheating). Use "book" for things worth getting checked soon but not an emergency (e.g. engine management light, tyre pressure). Use "ok" for informational lights that don't need urgent action (e.g. eco mode, low washer fluid). If you can't identify any lit warning light at all, return an empty "lights" array.`;
 }
