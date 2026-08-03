@@ -257,12 +257,74 @@
   .welcome-card{
     background:var(--white);border-radius:20px;padding:36px 32px;
     max-width:400px;width:100%;box-shadow:0 20px 50px rgba(15,23,42,0.25);
+    position:relative;
   }
   .welcome-card h1{font-size:1.4rem;margin-bottom:10px;}
   .welcome-card p.lead{margin-bottom:22px;font-size:0.92rem;}
   .welcome-card .btn{width:100%;text-align:center;}
   .welcome-fineprint{font-size:0.76rem;color:var(--muted-2);margin-top:14px;line-height:1.5;}
-  body.gated{overflow:hidden;}
+  .welcome-close{
+    position:absolute;top:16px;right:16px;width:28px;height:28px;border-radius:50%;
+    border:none;background:var(--bg);color:var(--muted);font-size:1rem;line-height:1;
+    cursor:pointer;display:flex;align-items:center;justify-content:center;
+  }
+  .welcome-close:hover{background:var(--line);color:var(--navy);}
+
+  /* small persistent prompt, shown after the popup is closed/skipped */
+  .save-nudge{
+    position:fixed;bottom:20px;right:20px;z-index:90;
+    background:var(--navy);color:var(--white);
+    padding:12px 18px;border-radius:12px;
+    display:none;align-items:center;gap:12px;
+    box-shadow:0 8px 24px rgba(15,23,42,0.3);
+    font-size:0.85rem;font-weight:600;cursor:pointer;
+  }
+  .save-nudge:hover{background:#1E293B;}
+
+  /* full company footer */
+  footer.site-footer{
+    background:var(--navy);color:var(--muted-2);
+    padding:40px 24px 28px;margin-top:20px;
+  }
+  .footer-inner{max-width:900px;margin:0 auto;}
+  .footer-top{
+    display:flex;justify-content:space-between;align-items:flex-start;
+    flex-wrap:wrap;gap:24px;margin-bottom:28px;
+  }
+  .footer-brand{display:flex;align-items:center;gap:8px;font-family:'Manrope',sans-serif;font-weight:800;color:var(--white);font-size:1.05rem;}
+  .footer-tagline{font-size:0.82rem;color:var(--muted-2);margin-top:6px;max-width:280px;line-height:1.5;}
+  .footer-social{display:flex;gap:12px;}
+  .footer-social a{
+    width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,0.06);
+    display:flex;align-items:center;justify-content:center;color:var(--white);
+    text-decoration:none;transition:background 0.15s;
+  }
+  .footer-social a:hover{background:rgba(255,255,255,0.14);}
+  .footer-links{
+    display:flex;flex-wrap:wrap;gap:8px 22px;font-size:0.82rem;
+    border-top:1px solid rgba(255,255,255,0.1);padding-top:20px;
+  }
+  .footer-links button{
+    background:none;border:none;color:var(--muted-2);font-size:0.82rem;
+    font-family:'Inter',sans-serif;cursor:pointer;padding:0;
+  }
+  .footer-links button:hover{color:var(--white);}
+  .footer-copyright{font-size:0.76rem;color:#475569;margin-top:20px;}
+
+  /* generic content modal (Mission, About, Terms, Privacy) */
+  .info-overlay{
+    display:none;position:fixed;inset:0;background:rgba(15,23,42,0.6);
+    align-items:center;justify-content:center;z-index:110;padding:20px;
+  }
+  .info-card{
+    background:var(--white);border-radius:20px;padding:36px;
+    max-width:560px;width:100%;max-height:80vh;overflow-y:auto;
+    box-shadow:0 20px 50px rgba(15,23,42,0.3);position:relative;
+  }
+  .info-card h1{font-size:1.3rem;margin-bottom:14px;}
+  .info-card p{font-size:0.92rem;line-height:1.7;color:var(--navy);margin:0 0 14px;}
+  .info-card h3{font-size:0.95rem;margin:20px 0 8px;}
+  .info-card .welcome-close{position:absolute;top:16px;right:16px;}
 </style>
 </head>
 <body>
@@ -274,11 +336,12 @@
   <input type="text" name="bot-field" />
 </form>
 
-<div class="welcome-overlay" id="welcome-overlay">
+<div class="welcome-overlay" id="welcome-overlay" style="display:none;">
   <div class="welcome-card">
+    <button class="welcome-close" onclick="closeWelcome()" aria-label="Close">✕</button>
     <span class="eyebrow">Welcome</span>
     <h1>Let's get your car set up</h1>
-    <p class="lead">Just your name and email to get started on the free plan — we'll use it to save your car's details and let you know before your MOT or service is due.</p>
+    <p class="lead">Whenever you're ready — just your name and email to get started on the free plan. We'll use it to save your car's details and let you know before your MOT or service is due.</p>
     <label>Your name</label>
     <input type="text" id="w-name" placeholder="Jane Smith">
     <label>Email address</label>
@@ -287,6 +350,8 @@
     <div class="welcome-fineprint">We'll only email you about your car — no spam. You can delete your details any time.</div>
   </div>
 </div>
+
+<div class="save-nudge" id="save-nudge" onclick="openWelcome()">Save your car & get reminders →</div>
 
 <header class="app-header">
   <div class="brand">
@@ -465,9 +530,112 @@
 
 </main>
 
-<footer>
-  SafVia — not a substitute for a qualified mechanic. In an emergency, pull over safely and call for assistance.
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-top">
+      <div>
+        <div class="footer-brand">
+          <svg width="20" height="20" viewBox="0 0 26 26" fill="none">
+            <path d="M19 5 C19 5 8 5 8 9.5 C8 14 19 12 19 16.5 C19 21 8 21 8 21" stroke="#2563EB" stroke-width="2.6" stroke-linecap="round" fill="none"/>
+          </svg>
+          SafVia
+        </div>
+        <div class="footer-tagline">Safe journeys. Smarter decisions. Your AI companion for understanding, maintaining and protecting your car.</div>
+      </div>
+      <div class="footer-social">
+        <a href="#" aria-label="SafVia on X" title="X (placeholder link)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M18.9 2H22l-7.6 8.7L23 22h-6.9l-5.4-7-6.2 7H2l8.1-9.3L1.5 2h7l4.9 6.4L18.9 2zm-1.2 18h1.9L7.4 4H5.4l12.3 16z"/></svg>
+        </a>
+        <a href="#" aria-label="SafVia on Instagram" title="Instagram (placeholder link)">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.5" cy="6.5" r="0.8" fill="currentColor" stroke="none"/></svg>
+        </a>
+      </div>
+    </div>
+    <div class="footer-links">
+      <button onclick="openInfo('mission')">Our mission</button>
+      <button onclick="openInfo('founder')">About the founder</button>
+      <button onclick="openInfo('contact')">Contact</button>
+      <button onclick="openInfo('terms')">Terms of use</button>
+      <button onclick="openInfo('privacy')">Privacy policy</button>
+    </div>
+    <div class="footer-copyright">© 2026 SafVia. Not a substitute for a qualified mechanic. In an emergency, pull over safely and call for assistance.</div>
+  </div>
 </footer>
+
+<!-- Footer info modals -->
+<div class="info-overlay" id="info-mission">
+  <div class="info-card">
+    <button class="welcome-close" onclick="closeInfo('mission')" aria-label="Close">✕</button>
+    <span class="eyebrow">Our mission</span>
+    <h1>Safe journeys. Smarter decisions.</h1>
+    <p>To give every driver the confidence to understand, maintain and protect their vehicle through intelligent AI guidance.</p>
+    <p>Our vision is to become the world's most trusted AI companion for vehicle ownership — the first thing you turn to for any car problem, and the quiet nudge that keeps the routine stuff (MOT, servicing, insurance) from ever catching you out.</p>
+    <h3>What we stand for</h3>
+    <p>Trust, clarity, honesty, confidence, safety, transparency and empowerment. No jargon, no panic, no confusion — just clear answers, explained the way a trusted friend would explain them.</p>
+  </div>
+</div>
+
+<div class="info-overlay" id="info-founder">
+  <div class="info-card">
+    <button class="welcome-close" onclick="closeInfo('founder')" aria-label="Close">✕</button>
+    <span class="eyebrow">About the founder</span>
+    <h1>Why SafVia exists</h1>
+    <p>SafVia was founded by Siama Qadar after a frightening experience with her own car. It was only three and a half years old, and it kept stopping working without warning. She jump-started it and it ran again — until a few days later, the radio began showing strange warning symptoms, and then the car died a second time.</p>
+    <p>Not knowing what was wrong, whether it was safe to drive, or who to trust for an honest answer was the hardest part — more stressful than the fault itself. She wanted a way to understand what was happening to her own car, get pointed towards the right help, and walk into a garage or call for assistance feeling informed rather than anxious.</p>
+    <p>SafVia is built to be that first, calm, honest voice — so no driver has to feel as lost as she did that day.</p>
+  </div>
+</div>
+
+<div class="info-overlay" id="info-contact">
+  <div class="info-card">
+    <button class="welcome-close" onclick="closeInfo('contact')" aria-label="Close">✕</button>
+    <span class="eyebrow">Get in touch</span>
+    <h1>Contact SafVia</h1>
+    <p>Questions, feedback, or partnership enquiries — we'd love to hear from you.</p>
+    <p><strong>Email:</strong> hello@safvia.co.uk <em>(placeholder — update once your inbox is set up)</em></p>
+    <p>Follow along on X and Instagram using the icons in the footer.</p>
+  </div>
+</div>
+
+<div class="info-overlay" id="info-terms">
+  <div class="info-card">
+    <button class="welcome-close" onclick="closeInfo('terms')" aria-label="Close">✕</button>
+    <span class="eyebrow">Legal</span>
+    <h1>Terms of use</h1>
+    <p><em>Draft — please have this reviewed by a solicitor before relying on it, given SafVia gives guidance about vehicle safety.</em></p>
+    <h3>1. What SafVia is</h3>
+    <p>SafVia is an AI-powered information tool that helps you understand possible causes of car problems, translate mechanic jargon, and keep track of maintenance dates. SafVia is not a mechanic, garage, or qualified vehicle inspector, and nothing in the app constitutes professional automotive, safety, legal or financial advice.</p>
+    <h3>2. No substitute for a qualified mechanic</h3>
+    <p>All guidance, including any "safe to drive" indication, is generated by AI based on the information you provide and is for general informational purposes only. Always have your vehicle inspected by a qualified mechanic before making decisions that affect your safety or the safety of others. SafVia accepts no liability for decisions made on the basis of information provided by the app.</p>
+    <h3>3. Your account and data</h3>
+    <p>Vehicle and diary information you enter is stored locally in your browser. Name and email provided at sign-up are stored to operate the free plan and contact you about your vehicle. See our Privacy Policy for full details.</p>
+    <h3>4. Acceptable use</h3>
+    <p>Don't use SafVia to submit unlawful, harmful, or abusive content, or attempt to disrupt or reverse-engineer the service.</p>
+    <h3>5. Changes</h3>
+    <p>We may update these terms as SafVia develops. Continued use of the app after changes means you accept the updated terms.</p>
+    <h3>6. Governing law</h3>
+    <p>These terms are governed by the laws of England and Wales.</p>
+  </div>
+</div>
+
+<div class="info-overlay" id="info-privacy">
+  <div class="info-card">
+    <button class="welcome-close" onclick="closeInfo('privacy')" aria-label="Close">✕</button>
+    <span class="eyebrow">Legal</span>
+    <h1>Privacy policy</h1>
+    <p><em>Draft — please have this reviewed by a solicitor/data protection professional before relying on it, particularly around UK GDPR compliance.</em></p>
+    <h3>What we collect</h3>
+    <p>Name and email address (when you sign up), and any car symptom descriptions or garage quotes you choose to submit to our AI tools. Vehicle details and your diary history are stored only in your own browser, not on SafVia's servers.</p>
+    <h3>Why we collect it</h3>
+    <p>To operate the free plan, send you reminders about your car (MOT, servicing), and to generate AI guidance in response to what you type.</p>
+    <h3>Who we share it with</h3>
+    <p>Submissions to the symptom checker and garage translator are sent to Anthropic (our AI provider) to generate a response. Name/email sign-ups are processed via Netlify Forms. Our site is hosted by Netlify. We do not sell your data to advertisers.</p>
+    <h3>Your rights</h3>
+    <p>Under UK GDPR, you can ask us to access, correct, or delete your data at any time by contacting us (see Contact). You can also clear your vehicle and diary data yourself at any time by clearing your browser's site data.</p>
+    <h3>Cookies</h3>
+    <p>SafVia does not use tracking or advertising cookies. It uses your browser's local storage only to remember your vehicle details and whether you've signed up.</p>
+  </div>
+</div>
 
 <script>
 const STORAGE_KEY = 'driveiq_vehicle_v1';
@@ -720,22 +888,47 @@ async function completeWelcome(){
   }
   localStorage.setItem(USER_KEY, JSON.stringify({ name, email }));
   document.getElementById('welcome-overlay').style.display = 'none';
-  document.body.classList.remove('gated');
+  document.getElementById('save-nudge').style.display = 'none';
   try{
     await fetch('/', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      keepalive: true,
       body: encodeForm({ 'form-name': 'signup', name, email })
     });
   }catch(e){ /* non-fatal — the person can still use the app even if this fails */ }
 }
+function openWelcome(){
+  document.getElementById('welcome-overlay').style.display = 'flex';
+}
+function closeWelcome(){
+  document.getElementById('welcome-overlay').style.display = 'none';
+  sessionStorage.setItem('safvia_welcome_dismissed', '1');
+  document.getElementById('save-nudge').style.display = 'flex';
+}
+function openInfo(key){
+  document.getElementById('info-'+key).style.display = 'flex';
+}
+function closeInfo(key){
+  document.getElementById('info-'+key).style.display = 'none';
+}
 function initWelcomeGate(){
   const user = getUser();
   if(user){
-    document.getElementById('welcome-overlay').style.display = 'none';
-  } else {
-    document.body.classList.add('gated');
+    return; // already signed up — never show either the popup or the nudge
   }
+  // Not signed up yet: let them explore first. Show the popup after a short delay,
+  // unless they've already closed it once this session — in which case just show
+  // the small persistent nudge so they can add their details whenever they're ready.
+  if(sessionStorage.getItem('safvia_welcome_dismissed')){
+    document.getElementById('save-nudge').style.display = 'flex';
+    return;
+  }
+  setTimeout(()=>{
+    if(!getUser()){
+      document.getElementById('welcome-overlay').style.display = 'flex';
+    }
+  }, 15000);
 }
 
 initWelcomeGate();
