@@ -1,6 +1,6 @@
 // Netlify Function: ai-diagnose
-// Handles three modes: "diagnose" (symptom checker), "translate" (garage quote translator),
-// and "scan" (dashboard warning-light photo scanner).
+// Handles four modes: "diagnose" (symptom checker), "translate" (garage quote translator),
+// "scan" (dashboard warning-light photo scanner), and "receipt" (service history receipt reader).
 // Requires an ANTHROPIC_API_KEY environment variable set in Netlify site settings.
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -26,13 +26,14 @@ exports.handler = async function (event) {
   const { mode, payload } = body;
 
   let messageContent;
-  if (mode === 'scan') {
+  if (mode === 'scan' || mode === 'receipt') {
     if (!payload || !payload.base64 || !payload.mediaType) {
       return { statusCode: 200, body: JSON.stringify({ error: 'No image received' }) };
     }
+    const promptText = mode === 'scan' ? buildScanPrompt() : buildReceiptPrompt();
     messageContent = [
       { type: 'image', source: { type: 'base64', media_type: payload.mediaType, data: payload.base64 } },
-      { type: 'text', text: buildScanPrompt() }
+      { type: 'text', text: promptText }
     ];
   } else {
     const prompt = mode === 'translate'
@@ -127,4 +128,23 @@ Respond with ONLY a JSON object, no preamble, no markdown fences, in this exact 
 }
 
 Use "stop" only for lights that mean serious immediate danger (e.g. oil pressure warning, brake system failure, engine overheating). Use "book" for things worth getting checked soon but not an emergency (e.g. engine management light, tyre pressure). Use "ok" for informational lights that don't need urgent action (e.g. eco mode, low washer fluid). If you can't identify any lit warning light at all, return an empty "lights" array.`;
+}
+
+function buildReceiptPrompt() {
+  return `You are SafVia, reading a photo of a UK garage receipt or invoice on behalf of a non-technical driver. ${VOICE_INSTRUCTION}
+
+Extract the key details from this receipt/invoice photo, and summarise the work done in plain English (translate any jargon — e.g. "replaced lower wishbone bushes" should be explained simply).
+
+If the photo is too blurry, dark, or clearly isn't a receipt/invoice, set "readable" to false rather than guessing at details.
+
+Respond with ONLY a JSON object, no preamble, no markdown fences, in this exact shape:
+{
+  "readable": true | false,
+  "garage": "name of the garage/dealer if visible, otherwise empty string",
+  "date": "date on the receipt if visible, in a readable UK format (e.g. '14 March 2026'), otherwise empty string",
+  "mileage": "mileage if visible on the receipt, as a plain number with no commas, otherwise empty string",
+  "cost": "total cost if visible, formatted like '£184.50', otherwise empty string",
+  "workDone": "2-4 plain-English sentences summarising what work was carried out and why, with no unexplained jargon",
+  "advisories": [ 0-3 short plain-English items for anything flagged as an advisory or recommended future work on the receipt — empty array if none ]
+}`;
 }
