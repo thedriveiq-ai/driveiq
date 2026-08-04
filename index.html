@@ -449,6 +449,8 @@
           <button class="btn ghost">Translate a quote →</button>
         </div>
       </div>
+
+      <div id="premium-card-slot"></div>
     </div>
   </section>
 
@@ -847,6 +849,51 @@ function renderDashboard(){
     svcEl.textContent = svcDays<0 ? 'Overdue' : `${svcDays} days (${v.service})`;
     svcRow.className = 'readout-row ' + (svcDays<0||svcDays<14 ? 'warn' : svcDays<45 ? 'soon' : 'ok');
   }
+  renderPremiumCard();
+}
+
+function renderPremiumCard(){
+  const slot = document.getElementById('premium-card-slot');
+  if(!slot) return;
+  if(currentPlan === 'premium'){
+    slot.innerHTML = `
+      <div class="card" style="margin-top:16px;background:var(--emerald-soft);border-color:transparent;">
+        <span class="eyebrow" style="color:#047857;">Premium</span>
+        <h2 style="margin-bottom:0;">You're all set — thanks for being a SafVia Premium member.</h2>
+      </div>
+    `;
+  } else {
+    slot.innerHTML = `
+      <div class="card" style="margin-top:16px;">
+        <span class="eyebrow">SafVia Premium — £6.99/month</span>
+        <h2>Go further with Premium</h2>
+        <p class="lead" style="margin-bottom:10px;">Unlimited AI diagnoses, the dashboard scanner, and the receipt reader — no limits.</p>
+        <button class="btn" onclick="startCheckout()">Upgrade to Premium →</button>
+      </div>
+    `;
+  }
+}
+
+async function startCheckout(){
+  if(!currentUser){
+    openWelcome();
+    return;
+  }
+  try{
+    const res = await fetch('/.netlify/functions/create-checkout-session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: currentUser.id, email: currentUser.email })
+    });
+    const data = await res.json();
+    if(data.error){
+      alert("We couldn't start checkout: " + data.error);
+      return;
+    }
+    window.location.href = data.url;
+  }catch(e){
+    alert("We couldn't start checkout — please try again in a moment.");
+  }
 }
 
 function getDiary(){
@@ -1237,6 +1284,7 @@ const SUPABASE_URL = 'https://xihflmpmdnaeclgzsqvm.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_m7PpsJzsisW68v9YxlhmSw__eYlbWx8';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 let currentUser = null; // set once someone is logged in
+let currentPlan = 'free'; // 'free' or 'premium', refreshed on login
 
 function encodeForm(data){
   return Object.keys(data).map(k => encodeURIComponent(k)+'='+encodeURIComponent(data[k])).join('&');
@@ -1343,6 +1391,12 @@ async function handleSignedIn(user){
 async function loadAccountData(){
   if(!currentUser) return;
 
+  // Plan status (free/premium)
+  try{
+    const { data: pRows } = await sb.from('profiles').select('plan').eq('id', currentUser.id).limit(1);
+    currentPlan = (pRows && pRows[0] && pRows[0].plan) ? pRows[0].plan : 'free';
+  }catch(e){ currentPlan = 'free'; }
+
   // Vehicle: if this account already has one saved (e.g. logging in on a new device),
   // that's the source of truth. If not, but this browser has a locally-saved vehicle
   // (e.g. they used the app before signing up), migrate that local one up to their account.
@@ -1392,6 +1446,7 @@ async function loadAccountData(){
   renderDashboard();
   renderDiary();
   renderServiceHistory();
+  renderPremiumCard();
 }
 
 function initWelcomeGate(){
@@ -1418,10 +1473,26 @@ function initWelcomeGate(){
   });
 }
 
+function checkCheckoutReturn(){
+  const params = new URLSearchParams(window.location.search);
+  const status = params.get('checkout');
+  if(status === 'success'){
+    alert("Thank you — you're now on SafVia Premium! It may take a few seconds for this to show on screen.");
+    // Give the webhook a moment to finish updating the account, then refresh what's shown
+    setTimeout(()=>{ if(currentUser) loadAccountData(); }, 2000);
+  } else if(status === 'cancelled'){
+    // No action needed — they just chose not to complete checkout
+  }
+  if(status){
+    window.history.replaceState({}, document.title, window.location.pathname);
+  }
+}
+
 initWelcomeGate();
 loadVehicleForm();
 updateHeader();
 renderDashboard();
+checkCheckoutReturn();
 </script>
 </body>
 </html>
