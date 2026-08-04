@@ -885,14 +885,24 @@ async function startCheckout(){
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId: currentUser.id, email: currentUser.email })
     });
-    const data = await res.json();
+    const rawText = await res.text();
+    console.log('SafVia: checkout response status', res.status, 'body:', rawText);
+    let data;
+    try{ data = JSON.parse(rawText); }catch(parseErr){
+      alert("Checkout didn't respond correctly (status " + res.status + "). Raw response: " + rawText.slice(0,300));
+      return;
+    }
     if(data.error){
       alert("We couldn't start checkout: " + data.error);
       return;
     }
+    if(!data.url){
+      alert("Checkout started but no payment link came back. Response was: " + rawText.slice(0,300));
+      return;
+    }
     window.location.href = data.url;
   }catch(e){
-    alert("We couldn't start checkout — please try again in a moment.");
+    alert("We couldn't start checkout — please try again in a moment. (" + e.message + ")");
   }
 }
 
