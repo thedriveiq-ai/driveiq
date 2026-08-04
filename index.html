@@ -563,6 +563,24 @@
     <h1>Your car's details</h1>
     <p class="lead">Everything about your car, kept in one place. The free plan keeps one car.</p>
 
+    <div class="card" id="account-card" style="display:none;">
+      <span class="eyebrow">Create your free account</span>
+      <h2 style="margin-bottom:10px;">Get reminders for this car</h2>
+      <p class="lead" style="margin-bottom:16px;">Add your name and email so we can save your car and let you know before your MOT or service is due. No password needed — we'll email you a one-click login link.</p>
+      <div class="grid2">
+        <div>
+          <label>Your name</label>
+          <input id="v-account-name" placeholder="Jane Smith">
+        </div>
+        <div>
+          <label>Email address</label>
+          <input id="v-account-email" placeholder="jane@email.com">
+        </div>
+      </div>
+      <button class="btn" onclick="createAccountFromVehicleTab()">Send my login link</button>
+      <div id="v-account-sent" style="display:none;color:var(--emerald);font-size:0.85rem;font-weight:600;margin-top:10px;">Check your email for the login link ✓</div>
+    </div>
+
     <div class="card">
       <div class="grid2">
         <div>
@@ -731,6 +749,7 @@ function switchTab(tab){
   if(tab==='dashboard') renderDashboard();
   if(tab==='diary') renderDiary();
   if(tab==='receipts') renderServiceHistory();
+  if(tab==='vehicle') updateAccountCardVisibility();
 }
 document.querySelectorAll('nav.tabs button').forEach(b=>{
   b.addEventListener('click', ()=>switchTab(b.dataset.tab));
@@ -1247,14 +1266,11 @@ async function logFaultPattern(entry){
   }catch(e){ /* non-fatal — logging failure should never block the person's result */ }
 }
 
-async function completeWelcome(){
-  const name = document.getElementById('w-name').value.trim();
-  const email = document.getElementById('w-email').value.trim();
+async function sendLoginLink(name, email){
   if(!name || !email || !email.includes('@')){
     alert('Please pop in your name and a valid email to continue.');
-    return;
+    return false;
   }
-  // Stash the name locally so we can attach it to their profile once they click the login link
   localStorage.setItem('safvia_pending_name', name);
   const { error } = await sb.auth.signInWithOtp({
     email,
@@ -1262,10 +1278,31 @@ async function completeWelcome(){
   });
   if(error){
     alert("We couldn't send that login link — please check the email address and try again.");
-    return;
+    return false;
   }
+  return true;
+}
+
+async function completeWelcome(){
+  const name = document.getElementById('w-name').value.trim();
+  const email = document.getElementById('w-email').value.trim();
+  const sent = await sendLoginLink(name, email);
+  if(!sent) return;
   document.getElementById('welcome-step-form').style.display = 'none';
   document.getElementById('welcome-step-sent').style.display = 'block';
+}
+
+async function createAccountFromVehicleTab(){
+  const name = document.getElementById('v-account-name').value.trim();
+  const email = document.getElementById('v-account-email').value.trim();
+  const sent = await sendLoginLink(name, email);
+  if(!sent) return;
+  document.getElementById('v-account-sent').style.display = 'block';
+}
+
+function updateAccountCardVisibility(){
+  const card = document.getElementById('account-card');
+  if(card) card.style.display = currentUser ? 'none' : 'block';
 }
 
 function openWelcome(){
@@ -1291,6 +1328,7 @@ async function handleSignedIn(user){
   currentUser = user;
   document.getElementById('welcome-overlay').style.display = 'none';
   document.getElementById('save-nudge').style.display = 'none';
+  updateAccountCardVisibility();
 
   // Apply a pending name (set just before the magic link was sent) to their profile
   const pendingName = localStorage.getItem('safvia_pending_name');
