@@ -215,7 +215,8 @@
     width:9px;height:9px;border-radius:50%;flex-shrink:0;
   }
   .verdict.yes .icon{background:var(--emerald);}
-  .verdict.no .icon{background:var(--amber);}
+  .verdict.no .icon{background:var(--red);}
+  .verdict.no{border-color:rgba(220,38,38,0.25);}
   .verdict.emergency .icon{background:var(--red);}
   .verdict.emergency{border-color:rgba(220,38,38,0.25);}
 
@@ -533,10 +534,10 @@
     <p class="lead">Photograph an invoice or receipt and we'll read it automatically — no typing needed. It builds into your car's full service history over time.</p>
 
     <div class="card" id="receipt-form">
-      <label>Photo of the receipt or invoice</label>
-      <input type="file" id="r-photo" accept="image/*" capture="environment" onchange="previewReceiptPhoto()">
+      <label>Photo(s) of the receipt or invoice — add extra pages if it's a multi-page document</label>
+      <input type="file" id="r-photo" accept="image/*" capture="environment" onchange="addReceiptPhoto()">
       <div id="receipt-preview" style="display:none;margin-bottom:16px;">
-        <img id="receipt-preview-img" style="max-width:100%;border-radius:12px;border:1px solid var(--line);">
+        <div id="receipt-preview-gallery" style="display:flex;flex-wrap:wrap;gap:10px;margin-bottom:10px;"></div>
       </div>
       <button class="btn" id="receipt-btn" onclick="runReceiptScan()" disabled>Read my receipt</button>
     </div>
@@ -1009,6 +1010,10 @@ function openDiaryDetail(index){
     if(d.questions) html += `<h3>Worth asking</h3><ul>${d.questions.map(q=>`<li>${q}</li>`).join('')}</ul>`;
   }
 
+  if(d.photoPaths && d.photoPaths.length){
+    html += `<button class="btn ghost" style="margin-top:14px;" onclick='openStoredPhotos(${JSON.stringify(d.photoPaths)})'>View original photo${d.photoPaths.length>1?'s':''}</button>`;
+  }
+
   document.getElementById('diary-detail-body').innerHTML = html;
   document.getElementById('info-diary-detail').style.display = 'flex';
 }
@@ -1120,6 +1125,45 @@ function localDiagnosisFallback(p){
 
 // ---------- Dashboard warning-light scanner ----------
 // ---------- Shared: resize a photo client-side before sending to the AI ----------
+// ---------- Document photo storage (so the real photo is saved, not just the AI's summary) ----------
+const DOCUMENTS_BUCKET = 'safvia-documents';
+
+async function uploadDocumentPhoto(base64, mediaType, folder){
+  if(!currentUser) return null;
+  try{
+    const byteChars = atob(base64);
+    const bytes = new Uint8Array(byteChars.length);
+    for(let i=0;i<byteChars.length;i++){ bytes[i] = byteChars.charCodeAt(i); }
+    const blob = new Blob([bytes], { type: mediaType });
+    const ext = mediaType.includes('png') ? 'png' : 'jpg';
+    const path = `${currentUser.id}/${folder}/${Date.now()}-${Math.random().toString(36).slice(2,8)}.${ext}`;
+    const { error } = await sb.storage.from(DOCUMENTS_BUCKET).upload(path, blob, { contentType: mediaType });
+    if(error) return null;
+    return path;
+  }catch(e){ return null; }
+}
+
+async function getSignedPhotoUrl(path){
+  if(!path) return null;
+  try{
+    const { data, error } = await sb.storage.from(DOCUMENTS_BUCKET).createSignedUrl(path, 3600);
+    if(error) return null;
+    return data.signedUrl;
+  }catch(e){ return null; }
+}
+
+async function openStoredPhotos(paths){
+  // paths: array of storage paths. Opens each as a temporary link in a new tab.
+  if(!paths || paths.length === 0){
+    alert("No saved photo for this one — it was added before photo saving was switched on.");
+    return;
+  }
+  for(const p of paths){
+    const url = await getSignedPhotoUrl(p);
+    if(url) window.open(url, '_blank');
+  }
+}
+
 function resizeImageFile(file, maxDim, quality){
   return new Promise((resolve)=>{
     const reader = new FileReader();
@@ -1184,8 +1228,10 @@ async function runScan(){
     usedRealAI = false;
   }
   renderScanResult(data);
+  const scanImageForUpload = scanImageData; // capture before resetScanForm clears it
+  const photoPath = scanImageForUpload ? await uploadDocumentPhoto(scanImageForUpload.base64, scanImageForUpload.mediaType, 'scans') : null;
   addDiaryEntry('Dashboard scan', (data.lights && data.lights[0]) ? data.lights[0].name : 'Dashboard photo', {
-    lights: data.lights, questions: data.questions
+    lights: data.lights, questions: data.questions, photoPaths: photoPath ? [photoPath] : []
   });
   if(usedRealAI) recordAIUsage();
   resetScanForm();
@@ -1246,24 +1292,49 @@ function localScanFallback(){
 }
 
 // ---------- Receipt scanner / service history ----------
-let receiptImageData = null;
+let receiptImages = []; // array of { base64, mediaType, dataUrl } — supports multi-page receipts
 const SERVICE_HISTORY_KEY = 'driveiq_service_history_v1';
 try{ serviceHistoryCache = JSON.parse(localStorage.getItem(SERVICE_HISTORY_KEY)) || []; }catch(e){ serviceHistoryCache = []; }
 
-function previewReceiptPhoto(){
-  const file = document.getElementById('r-photo').files[0];
+function addReceiptPhoto(){
+  const fileInput = document.getElementById('r-photo');
+  const file = fileInput.files[0];
   if(!file) return;
   resizeImageFile(file, 1200, 0.78).then(result=>{
-    receiptImageData = { base64: result.base64, mediaType: result.mediaType };
-    document.getElementById('receipt-preview-img').src = result.dataUrl;
-    document.getElementById('receipt-preview').style.display = 'block';
-    document.getElementById('receipt-btn').disabled = false;
+    receiptImages.push({ base64: result.base64, mediaType: result.mediaType, dataUrl: result.dataUrl });
+    renderReceiptGallery();
+    fileInput.value = ''; // lets them add the next page straight away
   });
+}
+function removeReceiptPhoto(index){
+  receiptImages.splice(index, 1);
+  renderReceiptGallery();
+}
+function renderReceiptGallery(){
+  const gallery = document.getElementById('receipt-preview-gallery');
+  const preview = document.getElementById('receipt-preview');
+  const btn = document.getElementById('receipt-btn');
+  if(receiptImages.length === 0){
+    preview.style.display = 'none';
+    btn.disabled = true;
+    btn.textContent = 'Read my receipt';
+    gallery.innerHTML = '';
+    return;
+  }
+  preview.style.display = 'block';
+  btn.disabled = false;
+  btn.textContent = receiptImages.length > 1 ? `Read my receipt (${receiptImages.length} pages) →` : 'Read my receipt';
+  gallery.innerHTML = receiptImages.map((img,i)=>`
+    <div style="position:relative;">
+      <img src="${img.dataUrl}" style="width:76px;height:76px;object-fit:cover;border-radius:8px;border:1px solid var(--line);">
+      <button onclick="removeReceiptPhoto(${i})" aria-label="Remove page" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:var(--navy);color:#fff;border:none;font-size:0.7rem;cursor:pointer;line-height:1;">✕</button>
+    </div>
+  `).join('');
 }
 
 async function runReceiptScan(){
-  if(!receiptImageData){
-    alert('Please choose a photo first.');
+  if(receiptImages.length === 0){
+    alert('Please add at least one photo first.');
     return;
   }
   if(!(await canUseAI())) return;
@@ -1271,13 +1342,15 @@ async function runReceiptScan(){
   resultEl.innerHTML = '<p class="loading">Reading your receipt</p>';
   document.getElementById('receipt-btn').disabled = true;
 
+  const imagesToSend = receiptImages.map(img => ({ base64: img.base64, mediaType: img.mediaType }));
+
   let data;
   let usedRealAI = true;
   try{
     const res = await fetch(AI_ENDPOINT, {
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({ mode:'receipt', payload: receiptImageData })
+      body: JSON.stringify({ mode:'receipt', payload: { images: imagesToSend } })
     });
     data = await res.json();
     if(data.error) throw new Error(data.error);
@@ -1289,11 +1362,17 @@ async function runReceiptScan(){
   document.getElementById('receipt-btn').disabled = false;
 
   if(data.readable !== false){
-    saveServiceHistoryEntry(data);
+    const imagesForUpload = [...receiptImages];
+    let photoPaths = [];
+    for(const img of imagesForUpload){
+      const p = await uploadDocumentPhoto(img.base64, img.mediaType, 'receipts');
+      if(p) photoPaths.push(p);
+    }
+    saveServiceHistoryEntry(data, photoPaths);
     renderServiceHistory();
     addDiaryEntry('Receipt', data.workDone ? data.workDone.slice(0,120) : 'Receipt logged', {
       garage: data.garage, date: data.date, mileage: data.mileage,
-      cost: data.cost, workDone: data.workDone, advisories: data.advisories
+      cost: data.cost, workDone: data.workDone, advisories: data.advisories, photoPaths
     });
     if(usedRealAI) recordAIUsage();
     resetReceiptForm();
@@ -1309,10 +1388,8 @@ async function runReceiptScan(){
 
 function resetReceiptForm(){
   document.getElementById('r-photo').value = '';
-  document.getElementById('receipt-preview').style.display = 'none';
-  document.getElementById('receipt-preview-img').src = '';
-  document.getElementById('receipt-btn').disabled = true;
-  receiptImageData = null;
+  receiptImages = [];
+  renderReceiptGallery();
 }
 
 function renderReceiptResult(data){
@@ -1345,10 +1422,11 @@ function renderReceiptResult(data){
 function getServiceHistory(){
   return serviceHistoryCache;
 }
-function saveServiceHistoryEntry(data){
+function saveServiceHistoryEntry(data, photoPaths){
   const entry = {
     garage: data.garage || '', date: data.date || '', mileage: data.mileage || '',
-    cost: data.cost || '', workDone: data.workDone || '', loggedAt: new Date().toLocaleDateString('en-GB')
+    cost: data.cost || '', workDone: data.workDone || '', loggedAt: new Date().toLocaleDateString('en-GB'),
+    photoPaths: photoPaths || []
   };
   serviceHistoryCache.unshift(entry);
   serviceHistoryCache = serviceHistoryCache.slice(0,100);
@@ -1356,7 +1434,8 @@ function saveServiceHistoryEntry(data){
   if(currentUser){
     sb.from('service_history').insert({
       user_id: currentUser.id, garage: entry.garage, service_date: entry.date,
-      mileage: entry.mileage, cost: entry.cost, work_done: entry.workDone
+      mileage: entry.mileage, cost: entry.cost, work_done: entry.workDone,
+      photo_paths: JSON.stringify(entry.photoPaths)
     }).then(()=>{}, ()=>{});
   }
 }
@@ -1367,10 +1446,11 @@ function renderServiceHistory(){
     el.innerHTML = '<div class="empty">No receipts logged yet — photograph one above to get started.</div>';
     return;
   }
-  el.innerHTML = list.map(e=>`
+  el.innerHTML = list.map((e,i)=>`
     <div class="diary-entry">
       <div class="when">${e.date || e.loggedAt} ${e.garage ? '· '+e.garage : ''} ${e.mileage ? '· '+e.mileage+' mi' : ''} ${e.cost ? '<span class="badge">'+e.cost+'</span>' : ''}</div>
       <div>${e.workDone}</div>
+      ${(e.photoPaths && e.photoPaths.length) ? `<button class="btn ghost" style="margin-top:8px;padding:6px 14px;font-size:0.8rem;" onclick="openStoredPhotos(${JSON.stringify(e.photoPaths).replace(/"/g,'&quot;')})">View original document${e.photoPaths.length>1?' ('+e.photoPaths.length+' pages)':''}</button>` : ''}
     </div>
   `).join('');
 }
@@ -1596,7 +1676,8 @@ async function loadAccountData(){
     if(sRows){
       serviceHistoryCache = sRows.map(r => ({
         garage: r.garage||'', date: r.service_date||'', mileage: r.mileage||'',
-        cost: r.cost||'', workDone: r.work_done||'', loggedAt: new Date(r.created_at).toLocaleDateString('en-GB')
+        cost: r.cost||'', workDone: r.work_done||'', loggedAt: new Date(r.created_at).toLocaleDateString('en-GB'),
+        photoPaths: r.photo_paths ? (function(){ try{ return JSON.parse(r.photo_paths); }catch(e){ return []; } })() : []
       }));
       localStorage.setItem(SERVICE_HISTORY_KEY, JSON.stringify(serviceHistoryCache));
     }
