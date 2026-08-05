@@ -1,6 +1,7 @@
 // Netlify Function: ai-diagnose
 // Handles four modes: "diagnose" (symptom checker), "translate" (garage quote translator),
-// "scan" (dashboard warning-light photo scanner), and "receipt" (service history receipt reader).
+// "scan" (dashboard warning-light photo scanner), and "receipt" (service history receipt reader,
+// which accepts one or more photos for multi-page documents).
 // Requires an ANTHROPIC_API_KEY environment variable set in Netlify site settings.
 
 const ANTHROPIC_URL = 'https://api.anthropic.com/v1/messages';
@@ -26,15 +27,24 @@ exports.handler = async function (event) {
   const { mode, payload } = body;
 
   let messageContent;
-  if (mode === 'scan' || mode === 'receipt') {
+  if (mode === 'scan') {
     if (!payload || !payload.base64 || !payload.mediaType) {
       return { statusCode: 200, body: JSON.stringify({ error: 'No image received' }) };
     }
-    const promptText = mode === 'scan' ? buildScanPrompt() : buildReceiptPrompt();
     messageContent = [
       { type: 'image', source: { type: 'base64', media_type: payload.mediaType, data: payload.base64 } },
-      { type: 'text', text: promptText }
+      { type: 'text', text: buildScanPrompt() }
     ];
+  } else if (mode === 'receipt') {
+    const images = (payload && Array.isArray(payload.images)) ? payload.images : [];
+    if (!images.length) {
+      return { statusCode: 200, body: JSON.stringify({ error: 'No image received' }) };
+    }
+    const imageBlocks = images.map(img => ({
+      type: 'image',
+      source: { type: 'base64', media_type: img.mediaType, data: img.base64 }
+    }));
+    messageContent = [...imageBlocks, { type: 'text', text: buildReceiptPrompt(images.length) }];
   } else {
     const prompt = mode === 'translate'
       ? buildTranslatePrompt(payload)
@@ -130,12 +140,15 @@ Respond with ONLY a JSON object, no preamble, no markdown fences, in this exact 
 Use "stop" only for lights that mean serious immediate danger (e.g. oil pressure warning, brake system failure, engine overheating). Use "book" for things worth getting checked soon but not an emergency (e.g. engine management light, tyre pressure). Use "ok" for informational lights that don't need urgent action (e.g. eco mode, low washer fluid). If you can't identify any lit warning light at all, return an empty "lights" array.`;
 }
 
-function buildReceiptPrompt() {
-  return `You are SafVia, reading a photo of a UK garage receipt or invoice on behalf of a non-technical driver. ${VOICE_INSTRUCTION}
+function buildReceiptPrompt(pageCount) {
+  const pageNote = (pageCount && pageCount > 1)
+    ? ` You have been given ${pageCount} photos that together make up one multi-page receipt or invoice — read them together as a single document, not as separate receipts.`
+    : '';
+  return `You are SafVia, reading a photo of a UK garage receipt or invoice on behalf of a non-technical driver. ${VOICE_INSTRUCTION}${pageNote}
 
-Extract the key details from this receipt/invoice photo, and summarise the work done in plain English (translate any jargon — e.g. "replaced lower wishbone bushes" should be explained simply).
+Extract the key details from the receipt/invoice, and summarise the work done in plain English (translate any jargon — e.g. "replaced lower wishbone bushes" should be explained simply).
 
-If the photo is too blurry, dark, or clearly isn't a receipt/invoice, set "readable" to false rather than guessing at details.
+If the photo(s) are too blurry, dark, or clearly aren't a receipt/invoice, set "readable" to false rather than guessing at details.
 
 Respond with ONLY a JSON object, no preamble, no markdown fences, in this exact shape:
 {
