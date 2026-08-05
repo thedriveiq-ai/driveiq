@@ -1066,6 +1066,12 @@ function resetCheckerForm(){
   document.querySelectorAll('#checker-form .chip-row .chip').forEach(c=>c.classList.remove('selected'));
 }
 
+function confidenceColor(pct){
+  if(pct > 70) return 'var(--red)';
+  if(pct > 50) return 'var(--amber)';
+  return 'var(--emerald)';
+}
+
 function renderDiagnosis(d){
   const el = document.getElementById('checker-result');
   const kind = d.safeToDrive === 'no' ? 'no' : d.safeToDrive === 'emergency' ? 'emergency' : 'yes';
@@ -1077,8 +1083,8 @@ function renderDiagnosis(d){
       <div class="verdict ${kind}"><span class="icon"></span><span>${bannerText}</span></div>
       ${d.likelihood.map(f=>`
         <div class="fault-row">
-          <div class="top"><span>${f.fault}</span><span class="pct">${f.confidence}%</span></div>
-          <div class="bar-track"><div class="bar-fill" style="width:${f.confidence}%;"></div></div>
+          <div class="top"><span>${f.fault}</span><span class="pct" style="color:${confidenceColor(f.confidence)};">${f.confidence}%</span></div>
+          <div class="bar-track"><div class="bar-fill" style="width:${f.confidence}%;background:${confidenceColor(f.confidence)};"></div></div>
         </div>
       `).join('')}
       <div class="result-meta">
@@ -1284,6 +1290,7 @@ async function runReceiptScan(){
 
   if(data.readable !== false){
     saveServiceHistoryEntry(data);
+    renderServiceHistory();
     addDiaryEntry('Receipt', data.workDone ? data.workDone.slice(0,120) : 'Receipt logged', {
       garage: data.garage, date: data.date, mileage: data.mileage,
       cost: data.cost, workDone: data.workDone, advisories: data.advisories
