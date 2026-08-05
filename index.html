@@ -1008,6 +1008,7 @@ async function runDiagnosis(){
   renderDiagnosis(data);
   addDiaryEntry('Diagnosis', payload.description);
   if(usedRealAI) recordAIUsage();
+  resetCheckerForm();
   logFaultPattern({
     tool: 'diagnose',
     description: payload.description,
@@ -1015,6 +1016,12 @@ async function runDiagnosis(){
     confidence: (data.likelihood && data.likelihood[0]) ? data.likelihood[0].confidence : '',
     safe_to_drive: data.safeToDrive || ''
   });
+}
+
+function resetCheckerForm(){
+  document.getElementById('c-main').value = '';
+  document.getElementById('c-before').value = '';
+  document.querySelectorAll('#checker-form .chip-row .chip').forEach(c=>c.classList.remove('selected'));
 }
 
 function renderDiagnosis(d){
@@ -1129,9 +1136,9 @@ async function runScan(){
     usedRealAI = false;
   }
   renderScanResult(data);
-  document.getElementById('scan-btn').disabled = false;
   addDiaryEntry('Dashboard scan', (data.lights && data.lights[0]) ? data.lights[0].name : 'Dashboard photo');
   if(usedRealAI) recordAIUsage();
+  resetScanForm();
   logFaultPattern({
     tool: 'scan',
     description: (data.lights || []).map(l=>l.name).join(', '),
@@ -1139,6 +1146,14 @@ async function runScan(){
     confidence: '',
     safe_to_drive: (data.lights && data.lights[0]) ? data.lights[0].severity : ''
   });
+}
+
+function resetScanForm(){
+  document.getElementById('s-photo').value = '';
+  document.getElementById('scan-preview').style.display = 'none';
+  document.getElementById('scan-preview-img').src = '';
+  document.getElementById('scan-btn').disabled = true;
+  scanImageData = null;
 }
 
 function renderScanResult(data){
@@ -1227,6 +1242,7 @@ async function runReceiptScan(){
     saveServiceHistoryEntry(data);
     addDiaryEntry('Receipt', data.workDone ? data.workDone.slice(0,120) : 'Receipt logged');
     if(usedRealAI) recordAIUsage();
+    resetReceiptForm();
     logFaultPattern({
       tool: 'receipt',
       description: data.workDone || '',
@@ -1235,6 +1251,14 @@ async function runReceiptScan(){
       safe_to_drive: ''
     });
   }
+}
+
+function resetReceiptForm(){
+  document.getElementById('r-photo').value = '';
+  document.getElementById('receipt-preview').style.display = 'none';
+  document.getElementById('receipt-preview-img').src = '';
+  document.getElementById('receipt-btn').disabled = true;
+  receiptImageData = null;
 }
 
 function renderReceiptResult(data){
@@ -1337,6 +1361,7 @@ async function runTranslate(){
     </div>
   `;
   addDiaryEntry('Translation', quote.slice(0,120));
+  document.getElementById('t-quote').value = '';
   logFaultPattern({
     tool: 'translate',
     description: quote.slice(0,200),
