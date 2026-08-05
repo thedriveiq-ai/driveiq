@@ -655,6 +655,8 @@
       <span class="eyebrow">Mileage over time</span>
       <h2 style="margin-bottom:10px;">Keep a mileage record</h2>
       <p class="lead" style="margin-bottom:10px;">Logging your mileage every so often builds a history that's genuinely useful when selling — buyers and dealers trust a documented mileage trend.</p>
+      <label>Mileage today</label>
+      <input id="mileage-log-input" placeholder="e.g. 43,250">
       <button class="btn ghost" onclick="logMileageEntry()">Log today's mileage</button>
       <div id="mileage-history-list" style="margin-top:16px;"></div>
     </div>
@@ -879,19 +881,24 @@ function loadVehicleForm(){
   renderMileageHistory();
 }
 function logMileageEntry(){
-  const mileage = document.getElementById('v-mileage').value;
+  const mileage = document.getElementById('mileage-log-input').value;
   if(!mileage){
-    alert("Pop your current mileage in the field above first, then log it.");
+    alert("Pop in today's mileage first, then log it.");
     return;
   }
   const v = getVehicle() || {};
   v.mileageHistory = v.mileageHistory || [];
   v.mileageHistory.unshift({ date: new Date().toISOString().slice(0,10), mileage });
+  v.mileage = mileage; // keep the main "Current mileage" field in sync with the latest log
   vehicleCache = v;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(v));
+  document.getElementById('v-mileage').value = mileage;
+  document.getElementById('mileage-log-input').value = '';
   renderMileageHistory();
+  updateHeader();
+  renderDashboard();
   if(currentUser){
-    sb.from('vehicles').update({ mileage_history: JSON.stringify(v.mileageHistory) }).eq('user_id', currentUser.id).then(()=>{}, ()=>{});
+    sb.from('vehicles').update({ mileage: v.mileage, mileage_history: JSON.stringify(v.mileageHistory) }).eq('user_id', currentUser.id).then(()=>{}, ()=>{});
   }
 }
 function renderMileageHistory(){
