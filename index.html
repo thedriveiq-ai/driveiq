@@ -382,7 +382,10 @@
     </svg>
     SafVia
   </div>
-  <div class="status" id="header-vehicle">No vehicle added</div>
+  <div style="display:flex;align-items:center;gap:14px;">
+    <div class="status" id="header-vehicle">No vehicle added</div>
+    <button id="sign-out-btn" onclick="signOutOfSafVia()" style="display:none;background:none;border:1px solid var(--line);color:var(--muted);font-size:0.78rem;font-weight:600;padding:6px 12px;border-radius:8px;cursor:pointer;">Sign out</button>
+  </div>
 </header>
 
 <nav class="tabs">
@@ -1417,6 +1420,16 @@ function updateAccountCardVisibility(){
   if(card) card.style.display = currentUser ? 'none' : 'block';
 }
 
+async function signOutOfSafVia(){
+  await sb.auth.signOut();
+  // Clear locally-cached data so the next login (or the logged-out view) starts clean
+  localStorage.removeItem(STORAGE_KEY);
+  localStorage.removeItem(DIARY_KEY);
+  localStorage.removeItem(SERVICE_HISTORY_KEY);
+  sessionStorage.removeItem('safvia_welcome_dismissed');
+  location.reload();
+}
+
 function openWelcome(){
   document.getElementById('welcome-step-form').style.display = 'block';
   document.getElementById('welcome-step-sent').style.display = 'none';
@@ -1441,6 +1454,7 @@ async function handleSignedIn(user){
   document.getElementById('welcome-overlay').style.display = 'none';
   document.getElementById('save-nudge').style.display = 'none';
   updateAccountCardVisibility();
+  document.getElementById('sign-out-btn').style.display = 'inline-block';
 
   // Apply a pending name (set just before the magic link was sent) to their profile
   const pendingName = localStorage.getItem('safvia_pending_name');
