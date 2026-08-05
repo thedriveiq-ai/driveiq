@@ -822,6 +822,9 @@ function selectedChip(group){
   return sel ? sel.dataset.val : null;
 }
 
+function getVehicle(){
+  return vehicleCache;
+}
 async function saveVehicle(){
   const v = {
     reg: document.getElementById('v-reg').value,
