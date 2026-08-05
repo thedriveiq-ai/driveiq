@@ -425,6 +425,15 @@
         <div class="readout-row" id="dash-service-row">
           <span class="muted">Next service due</span><span class="val" id="dash-service">—</span>
         </div>
+        <div class="readout-row" id="dash-road-tax-row">
+          <span class="muted">Road tax due</span><span class="val" id="dash-road-tax">—</span>
+        </div>
+        <div class="readout-row" id="dash-insurance-row">
+          <span class="muted">Insurance renews</span><span class="val" id="dash-insurance">—</span>
+        </div>
+        <div class="readout-row" id="dash-breakdown-row" style="display:none;">
+          <span class="muted">Roadside assistance</span><span class="val" id="dash-breakdown" style="color:#93C5FD;"></span>
+        </div>
       </div>
 
       <div class="grid2">
@@ -450,7 +459,7 @@
           <span class="eyebrow">Confused by a quote?</span>
           <h2>Translate it</h2>
           <p class="lead" style="margin-bottom:10px;">Paste what the garage told you. We'll explain it simply and tell you if it's urgent.</p>
-          <button class="btn ghost">Translate a quote →</button>
+          <button class="btn">Translate a quote →</button>
         </div>
       </div>
 
@@ -613,9 +622,41 @@
           <label>Next service due date</label>
           <input id="v-service" type="date">
         </div>
+        <div>
+          <label>Road tax due date</label>
+          <input id="v-road-tax" type="date">
+        </div>
+        <div>
+          <label>Insurance renewal date</label>
+          <input id="v-insurance" type="date">
+        </div>
       </div>
       <button class="btn" onclick="saveVehicle()">Save</button>
       <span id="vehicle-saved-msg" class="mono" style="display:none;color:var(--emerald);margin-left:12px;font-size:0.85rem;font-weight:600;">Saved ✓</span>
+    </div>
+
+    <div class="card">
+      <span class="eyebrow">In an emergency</span>
+      <h2 style="margin-bottom:10px;">Roadside assistance</h2>
+      <div class="grid2">
+        <div>
+          <label>Who's it with</label>
+          <input id="v-breakdown-provider" placeholder="e.g. RAC, AA, insurer's cover">
+        </div>
+        <div>
+          <label>Phone number</label>
+          <input id="v-breakdown-phone" placeholder="0800 123 4567">
+        </div>
+      </div>
+      <button class="btn ghost" onclick="saveVehicle()">Save</button>
+    </div>
+
+    <div class="card">
+      <span class="eyebrow">Mileage over time</span>
+      <h2 style="margin-bottom:10px;">Keep a mileage record</h2>
+      <p class="lead" style="margin-bottom:10px;">Logging your mileage every so often builds a history that's genuinely useful when selling — buyers and dealers trust a documented mileage trend.</p>
+      <button class="btn ghost" onclick="logMileageEntry()">Log today's mileage</button>
+      <div id="mileage-history-list" style="margin-top:16px;"></div>
     </div>
   </section>
 
@@ -781,9 +822,6 @@ function selectedChip(group){
   return sel ? sel.dataset.val : null;
 }
 
-function getVehicle(){
-  return vehicleCache;
-}
 async function saveVehicle(){
   const v = {
     reg: document.getElementById('v-reg').value,
@@ -791,19 +829,28 @@ async function saveVehicle(){
     year: document.getElementById('v-year').value,
     mileage: document.getElementById('v-mileage').value,
     mot: document.getElementById('v-mot').value,
-    service: document.getElementById('v-service').value
+    service: document.getElementById('v-service').value,
+    roadTax: document.getElementById('v-road-tax').value,
+    insurance: document.getElementById('v-insurance').value,
+    breakdownProvider: document.getElementById('v-breakdown-provider').value,
+    breakdownPhone: document.getElementById('v-breakdown-phone').value,
+    mileageHistory: (vehicleCache && vehicleCache.mileageHistory) || []
   };
   vehicleCache = v;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(v));
   document.getElementById('vehicle-saved-msg').style.display='inline';
   setTimeout(()=>document.getElementById('vehicle-saved-msg').style.display='none', 2000);
   updateHeader();
+  renderDashboard();
   if(currentUser){
     try{
       const result = await sb.from('vehicles').upsert({
         user_id: currentUser.id,
         reg: v.reg, model: v.model, year: v.year, mileage: v.mileage,
-        mot_date: v.mot || null, service_date: v.service || null
+        mot_date: v.mot || null, service_date: v.service || null,
+        road_tax_date: v.roadTax || null, insurance_date: v.insurance || null,
+        breakdown_provider: v.breakdownProvider, breakdown_phone: v.breakdownPhone,
+        mileage_history: JSON.stringify(v.mileageHistory)
       }, { onConflict: 'user_id' });
       if(result.error){
         console.error('SafVia: vehicle save to account failed:', result.error);
@@ -822,6 +869,40 @@ function loadVehicleForm(){
   document.getElementById('v-mileage').value = v.mileage||'';
   document.getElementById('v-mot').value = v.mot||'';
   document.getElementById('v-service').value = v.service||'';
+  document.getElementById('v-road-tax').value = v.roadTax||'';
+  document.getElementById('v-insurance').value = v.insurance||'';
+  document.getElementById('v-breakdown-provider').value = v.breakdownProvider||'';
+  document.getElementById('v-breakdown-phone').value = v.breakdownPhone||'';
+  renderMileageHistory();
+}
+function logMileageEntry(){
+  const mileage = document.getElementById('v-mileage').value;
+  if(!mileage){
+    alert("Pop your current mileage in the field above first, then log it.");
+    return;
+  }
+  const v = getVehicle() || {};
+  v.mileageHistory = v.mileageHistory || [];
+  v.mileageHistory.unshift({ date: new Date().toISOString().slice(0,10), mileage });
+  vehicleCache = v;
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(v));
+  renderMileageHistory();
+  if(currentUser){
+    sb.from('vehicles').update({ mileage_history: JSON.stringify(v.mileageHistory) }).eq('user_id', currentUser.id).then(()=>{}, ()=>{});
+  }
+}
+function renderMileageHistory(){
+  const el = document.getElementById('mileage-history-list');
+  if(!el) return;
+  const v = getVehicle();
+  const history = (v && v.mileageHistory) || [];
+  if(history.length === 0){
+    el.innerHTML = '<div class="empty">No mileage logged yet.</div>';
+    return;
+  }
+  el.innerHTML = history.map(h => `
+    <div class="readout-row"><span>${h.date}</span><span class="val" style="color:var(--navy);">${h.mileage} mi</span></div>
+  `).join('');
 }
 function updateHeader(){
   const v = getVehicle();
@@ -859,6 +940,30 @@ function renderDashboard(){
   else{
     svcEl.textContent = svcDays<0 ? 'Overdue' : `${svcDays} days (${v.service})`;
     svcRow.className = 'readout-row ' + (svcDays<0||svcDays<14 ? 'warn' : svcDays<45 ? 'soon' : 'ok');
+  }
+  const taxDays = daysUntil(v.roadTax);
+  const taxRow = document.getElementById('dash-road-tax-row');
+  const taxEl = document.getElementById('dash-road-tax');
+  if(taxDays===null){ taxEl.textContent='—'; taxRow.className='readout-row'; }
+  else{
+    taxEl.textContent = taxDays<0 ? 'Overdue' : `${taxDays} days (${v.roadTax})`;
+    taxRow.className = 'readout-row ' + (taxDays<0||taxDays<14 ? 'warn' : taxDays<45 ? 'soon' : 'ok');
+  }
+  const insDays = daysUntil(v.insurance);
+  const insRow = document.getElementById('dash-insurance-row');
+  const insEl = document.getElementById('dash-insurance');
+  if(insDays===null){ insEl.textContent='—'; insRow.className='readout-row'; }
+  else{
+    insEl.textContent = insDays<0 ? 'Overdue' : `${insDays} days (${v.insurance})`;
+    insRow.className = 'readout-row ' + (insDays<0||insDays<14 ? 'warn' : insDays<45 ? 'soon' : 'ok');
+  }
+  const breakdownRow = document.getElementById('dash-breakdown-row');
+  const breakdownEl = document.getElementById('dash-breakdown');
+  if(v.breakdownProvider || v.breakdownPhone){
+    breakdownRow.style.display = 'flex';
+    breakdownEl.innerHTML = `${v.breakdownProvider||''} ${v.breakdownPhone ? `<a href="tel:${v.breakdownPhone.replace(/\s/g,'')}" style="color:#93C5FD;">${v.breakdownPhone}</a>` : ''}`;
+  } else {
+    breakdownRow.style.display = 'none';
   }
   renderPremiumCard();
 }
@@ -1645,7 +1750,10 @@ async function loadAccountData(){
       const row = vRows[0];
       vehicleCache = {
         reg: row.reg||'', model: row.model||'', year: row.year||'',
-        mileage: row.mileage||'', mot: row.mot_date||'', service: row.service_date||''
+        mileage: row.mileage||'', mot: row.mot_date||'', service: row.service_date||'',
+        roadTax: row.road_tax_date||'', insurance: row.insurance_date||'',
+        breakdownProvider: row.breakdown_provider||'', breakdownPhone: row.breakdown_phone||'',
+        mileageHistory: row.mileage_history ? (function(){ try{ return JSON.parse(row.mileage_history); }catch(e){ return []; } })() : []
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(vehicleCache));
     } else if(vehicleCache){
@@ -1653,7 +1761,10 @@ async function loadAccountData(){
       await sb.from('vehicles').upsert({
         user_id: currentUser.id, reg: vehicleCache.reg, model: vehicleCache.model,
         year: vehicleCache.year, mileage: vehicleCache.mileage,
-        mot_date: vehicleCache.mot || null, service_date: vehicleCache.service || null
+        mot_date: vehicleCache.mot || null, service_date: vehicleCache.service || null,
+        road_tax_date: vehicleCache.roadTax || null, insurance_date: vehicleCache.insurance || null,
+        breakdown_provider: vehicleCache.breakdownProvider || null, breakdown_phone: vehicleCache.breakdownPhone || null,
+        mileage_history: JSON.stringify(vehicleCache.mileageHistory || [])
       }, { onConflict: 'user_id' });
     }
   }catch(e){ /* keep whatever's cached locally if this fails */ }
