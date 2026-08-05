@@ -736,6 +736,13 @@
   </div>
 </div>
 
+<div class="info-overlay" id="info-diary-detail">
+  <div class="info-card">
+    <button class="welcome-close" onclick="closeInfo('diary-detail')" aria-label="Close">✕</button>
+    <div id="diary-detail-body"></div>
+  </div>
+</div>
+
 <script>
 const STORAGE_KEY = 'driveiq_vehicle_v1';
 const DIARY_KEY = 'driveiq_diary_v1';
@@ -950,13 +957,16 @@ async function startCheckout(){
 function getDiary(){
   return diaryCache;
 }
-function addDiaryEntry(type, summary){
-  const entry = { type, summary, when: new Date().toLocaleString('en-GB') };
+function addDiaryEntry(type, summary, detail){
+  const entry = { type, summary, when: new Date().toLocaleString('en-GB'), detail: detail || null };
   diaryCache.unshift(entry);
   diaryCache = diaryCache.slice(0,50);
   localStorage.setItem(DIARY_KEY, JSON.stringify(diaryCache));
   if(currentUser){
-    sb.from('diary_entries').insert({ user_id: currentUser.id, type, summary }).then(()=>{}, ()=>{});
+    sb.from('diary_entries').insert({
+      user_id: currentUser.id, type, summary,
+      detail: detail ? JSON.stringify(detail) : null
+    }).then(()=>{}, ()=>{});
   }
 }
 function renderDiary(){
@@ -966,12 +976,41 @@ function renderDiary(){
     el.innerHTML = '<div class="empty">Nothing here yet. Ask about a symptom or translate a quote to get started.</div>';
     return;
   }
-  el.innerHTML = d.map(e=>`
-    <div class="diary-entry">
-      <div class="when">${e.when} <span class="badge">${e.type}</span></div>
+  el.innerHTML = d.map((e,i)=>`
+    <div class="diary-entry" ${e.detail ? `style="cursor:pointer;" onclick="openDiaryDetail(${i})"` : ''}>
+      <div class="when">${e.when} <span class="badge">${e.type}</span>${e.detail ? ' <span style="color:var(--blue);font-size:0.75rem;">— tap to see the answer</span>' : ''}</div>
       <div>${e.summary}</div>
     </div>
   `).join('');
+}
+
+function openDiaryDetail(index){
+  const entry = getDiary()[index];
+  if(!entry || !entry.detail) return;
+  const d = entry.detail;
+  let html = `<span class="eyebrow">${entry.type} — ${entry.when}</span><h1 style="margin-bottom:14px;">${entry.summary}</h1>`;
+
+  if(entry.type === 'Diagnosis'){
+    html += (d.likelihood || []).map(f => `<p><strong>${f.fault}</strong> — ${f.confidence}% likely</p>`).join('');
+    html += `<p><strong>Likely cost:</strong> ${d.cost || '—'} &nbsp; <strong>Repair time:</strong> ${d.repairTime || '—'}</p>`;
+    html += `<p><strong>Safe to drive:</strong> ${d.safeToDrive || '—'}</p>`;
+    if(d.questions) html += `<h3>Worth asking</h3><ul>${d.questions.map(q=>`<li>${q}</li>`).join('')}</ul>`;
+  } else if(entry.type === 'Dashboard scan'){
+    html += (d.lights || []).map(l => `<p><strong>${l.name}</strong> (${l.severity})<br>${l.explanation}</p>`).join('');
+    if(d.questions) html += `<h3>Worth asking</h3><ul>${d.questions.map(q=>`<li>${q}</li>`).join('')}</ul>`;
+  } else if(entry.type === 'Receipt'){
+    html += `<p><strong>Garage:</strong> ${d.garage || '—'} &nbsp; <strong>Date:</strong> ${d.date || '—'}</p>`;
+    html += `<p><strong>Mileage:</strong> ${d.mileage || '—'} &nbsp; <strong>Cost:</strong> ${d.cost || '—'}</p>`;
+    html += `<p>${d.workDone || ''}</p>`;
+    if(d.advisories && d.advisories.length) html += `<h3>Worth keeping an eye on</h3><ul>${d.advisories.map(a=>`<li>${a}</li>`).join('')}</ul>`;
+  } else if(entry.type === 'Translation'){
+    html += `<p>${d.plainEnglish || ''}</p>`;
+    html += `<p><strong>How urgent:</strong> ${d.urgency || '—'} &nbsp; <strong>Typical cost:</strong> ${d.cost || '—'}</p>`;
+    if(d.questions) html += `<h3>Worth asking</h3><ul>${d.questions.map(q=>`<li>${q}</li>`).join('')}</ul>`;
+  }
+
+  document.getElementById('diary-detail-body').innerHTML = html;
+  document.getElementById('info-diary-detail').style.display = 'flex';
 }
 
 async function runDiagnosis(){
@@ -1006,7 +1045,10 @@ async function runDiagnosis(){
     usedRealAI = false;
   }
   renderDiagnosis(data);
-  addDiaryEntry('Diagnosis', payload.description);
+  addDiaryEntry('Diagnosis', payload.description, {
+    likelihood: data.likelihood, cost: data.cost, repairTime: data.repairTime,
+    safeToDrive: data.safeToDrive, questions: data.questions
+  });
   if(usedRealAI) recordAIUsage();
   resetCheckerForm();
   logFaultPattern({
@@ -1136,7 +1178,9 @@ async function runScan(){
     usedRealAI = false;
   }
   renderScanResult(data);
-  addDiaryEntry('Dashboard scan', (data.lights && data.lights[0]) ? data.lights[0].name : 'Dashboard photo');
+  addDiaryEntry('Dashboard scan', (data.lights && data.lights[0]) ? data.lights[0].name : 'Dashboard photo', {
+    lights: data.lights, questions: data.questions
+  });
   if(usedRealAI) recordAIUsage();
   resetScanForm();
   logFaultPattern({
@@ -1240,7 +1284,10 @@ async function runReceiptScan(){
 
   if(data.readable !== false){
     saveServiceHistoryEntry(data);
-    addDiaryEntry('Receipt', data.workDone ? data.workDone.slice(0,120) : 'Receipt logged');
+    addDiaryEntry('Receipt', data.workDone ? data.workDone.slice(0,120) : 'Receipt logged', {
+      garage: data.garage, date: data.date, mileage: data.mileage,
+      cost: data.cost, workDone: data.workDone, advisories: data.advisories
+    });
     if(usedRealAI) recordAIUsage();
     resetReceiptForm();
     logFaultPattern({
@@ -1360,7 +1407,9 @@ async function runTranslate(){
       </div>
     </div>
   `;
-  addDiaryEntry('Translation', quote.slice(0,120));
+  addDiaryEntry('Translation', quote.slice(0,120), {
+    plainEnglish: data.plainEnglish, urgency: data.urgency, cost: data.cost, questions: data.questions
+  });
   document.getElementById('t-quote').value = '';
   logFaultPattern({
     tool: 'translate',
@@ -1526,7 +1575,10 @@ async function loadAccountData(){
   try{
     const { data: dRows } = await sb.from('diary_entries').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false }).limit(50);
     if(dRows){
-      diaryCache = dRows.map(r => ({ type: r.type, summary: r.summary, when: new Date(r.created_at).toLocaleString('en-GB') }));
+      diaryCache = dRows.map(r => ({
+        type: r.type, summary: r.summary, when: new Date(r.created_at).toLocaleString('en-GB'),
+        detail: r.detail ? (function(){ try{ return JSON.parse(r.detail); }catch(e){ return null; } })() : null
+      }));
       localStorage.setItem(DIARY_KEY, JSON.stringify(diaryCache));
     }
   }catch(e){ /* keep local diary if this fails */ }
