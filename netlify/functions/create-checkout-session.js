@@ -3,7 +3,7 @@
 // Uses Stripe's plain REST API via fetch — no npm package needed, so nothing extra to bundle.
 
 const STRIPE_API = 'https://api.stripe.com/v1/checkout/sessions';
-const PRICE_ID = 'price_1U0ioTHZsHyH8AQ7qkJC2nV8'; // SafVia Premium, £6.99/month
+const PRICE_ID = 'price_1U1SpAHqafeDS6eiOmcZ6GzU'; // SafVia Premium, £6.99/month (LIVE)
 
 exports.handler = async function (event) {
   if (event.httpMethod !== 'POST') {
