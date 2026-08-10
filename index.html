@@ -412,7 +412,7 @@
       <button class="btn" onclick="switchTab('vehicle')">Add your car</button>
     </div>
 
-    <div id="dash-content" style="display:none;">
+    <div id="dash-hero-slot" style="display:none;">
       <div class="card hero">
         <span class="eyebrow" style="color:#60A5FA;">Your car</span>
         <h2 id="dash-vehicle-name" style="color:#fff;">—</h2>
@@ -435,36 +435,36 @@
           <span class="muted">Roadside assistance</span><span class="val" id="dash-breakdown" style="color:#93C5FD;"></span>
         </div>
       </div>
-
-      <div class="grid2">
-        <div class="card" style="cursor:pointer;" onclick="switchTab('checker')">
-          <span class="eyebrow">Something feel off?</span>
-          <h2>Tell us what's happening</h2>
-          <p class="lead" style="margin-bottom:10px;">A few quick questions, then a clear answer: what it likely is, whether it's safe to drive, and what it should cost.</p>
-          <button class="btn">Get started →</button>
-        </div>
-        <div class="card" style="cursor:pointer;" onclick="switchTab('scanner')">
-          <span class="eyebrow">A light's come on?</span>
-          <h2>Photograph your dashboard</h2>
-          <p class="lead" style="margin-bottom:10px;">Snap the warning light and we'll tell you what it means and how urgent it is.</p>
-          <button class="btn">Scan a light →</button>
-        </div>
-        <div class="card" style="cursor:pointer;" onclick="switchTab('receipts')">
-          <span class="eyebrow">Just had work done?</span>
-          <h2>Photograph the receipt</h2>
-          <p class="lead" style="margin-bottom:10px;">We'll read it and keep your service history in one place, automatically.</p>
-          <button class="btn">Log a receipt →</button>
-        </div>
-        <div class="card" style="cursor:pointer;" onclick="switchTab('translator')">
-          <span class="eyebrow">Confused by a quote?</span>
-          <h2>Translate it</h2>
-          <p class="lead" style="margin-bottom:10px;">Paste what the garage told you. We'll explain it simply and tell you if it's urgent.</p>
-          <button class="btn">Translate a quote →</button>
-        </div>
-      </div>
-
-      <div id="premium-card-slot"></div>
     </div>
+
+    <div class="grid2">
+      <div class="card" style="cursor:pointer;" onclick="switchTab('checker')">
+        <span class="eyebrow">Something feel off?</span>
+        <h2>Tell us what's happening</h2>
+        <p class="lead" style="margin-bottom:10px;">A few quick questions, then a clear answer: what it likely is, whether it's safe to drive, and what it should cost.</p>
+        <button class="btn">Get started →</button>
+      </div>
+      <div class="card" style="cursor:pointer;" onclick="switchTab('scanner')">
+        <span class="eyebrow">A light's come on?</span>
+        <h2>Photograph your dashboard</h2>
+        <p class="lead" style="margin-bottom:10px;">Snap the warning light and we'll tell you what it means and how urgent it is.</p>
+        <button class="btn">Scan a light →</button>
+      </div>
+      <div class="card" style="cursor:pointer;" onclick="switchTab('receipts')">
+        <span class="eyebrow">Just had work done?</span>
+        <h2>Photograph the receipt</h2>
+        <p class="lead" style="margin-bottom:10px;">We'll read it and keep your service history in one place, automatically.</p>
+        <button class="btn">Log a receipt →</button>
+      </div>
+      <div class="card" style="cursor:pointer;" onclick="switchTab('translator')">
+        <span class="eyebrow">Confused by a quote?</span>
+        <h2>Translate it</h2>
+        <p class="lead" style="margin-bottom:10px;">Paste what the garage told you. We'll explain it simply and tell you if it's urgent.</p>
+        <button class="btn">Translate a quote →</button>
+      </div>
+    </div>
+
+    <div id="premium-card-slot"></div>
   </section>
 
   <!-- SYMPTOM CHECKER -->
@@ -648,7 +648,8 @@
           <input id="v-breakdown-phone" placeholder="0800 123 4567">
         </div>
       </div>
-      <button class="btn ghost" onclick="saveVehicle()">Save</button>
+      <button class="btn" onclick="saveVehicle()">Save</button>
+      <span id="breakdown-saved-msg" class="mono" style="display:none;color:var(--emerald);margin-left:12px;font-size:0.85rem;font-weight:600;">Saved ✓</span>
     </div>
 
     <div class="card">
@@ -845,6 +846,8 @@ async function saveVehicle(){
   localStorage.setItem(STORAGE_KEY, JSON.stringify(v));
   document.getElementById('vehicle-saved-msg').style.display='inline';
   setTimeout(()=>document.getElementById('vehicle-saved-msg').style.display='none', 2000);
+  document.getElementById('breakdown-saved-msg').style.display='inline';
+  setTimeout(()=>document.getElementById('breakdown-saved-msg').style.display='none', 2000);
   updateHeader();
   renderDashboard();
   if(currentUser){
@@ -927,11 +930,12 @@ function renderDashboard(){
   const v = getVehicle();
   if(!v || !v.model){
     document.getElementById('dash-empty').style.display='block';
-    document.getElementById('dash-content').style.display='none';
+    document.getElementById('dash-hero-slot').style.display='none';
+    renderPremiumCard();
     return;
   }
   document.getElementById('dash-empty').style.display='none';
-  document.getElementById('dash-content').style.display='block';
+  document.getElementById('dash-hero-slot').style.display='block';
   document.getElementById('dash-vehicle-name').textContent = `${v.model}${v.year ? ' ('+v.year+')' : ''}`;
   document.getElementById('dash-mileage').textContent = v.mileage ? v.mileage+' mi' : '—';
 
