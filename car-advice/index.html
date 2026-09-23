@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-0EQZ6D648E"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-0EQZ6D648E');
+</script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Car Advice & Guides for Everyday Drivers | SafVia</title>
+<meta name="description" content="Simple car advice and practical guides for everyday drivers. Understand your car, warning lights, maintenance and more with SafVia.">
+<link rel="canonical" href="https://www.safvia.co.uk/car-advice/">
+<meta property="og:title" content="Car Advice & Guides for Everyday Drivers | SafVia">
+<meta property="og:description" content="Simple car advice and practical guides for everyday drivers. Understand your car, warning lights, maintenance and more with SafVia.">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://www.safvia.co.uk/car-advice/">
+<meta property="og:site_name" content="SafVia">
+<meta name="twitter:card" content="summary">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy:#0F172A;
+    --blue:#2563EB;
+    --blue-soft:rgba(37,99,235,0.08);
+    --bg:#F8FAFC;
+    --white:#FFFFFF;
+    --line:#E6EAF0;
+    --muted:#64748B;
+    --muted-2:#94A3B8;
+    font-size:16px;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--navy);font-family:'Inter',sans-serif;-webkit-font-smoothing:antialiased;}
+  h1,h2,h3,.heading{font-family:'Manrope',sans-serif;font-weight:700;}
+  a{color:inherit;}
+  .wrap{max-width:900px;margin:0 auto;padding:0 20px;}
+
+  header.app-header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:18px 24px;border-bottom:1px solid var(--line);background:var(--white);
+  }
+  .brand{display:flex;align-items:center;gap:8px;font-family:'Manrope',sans-serif;font-weight:800;font-size:1.05rem;}
+  .brand a{display:flex;align-items:center;gap:8px;text-decoration:none;color:var(--navy);}
+
+  .hero{padding:64px 0 40px;text-align:center;}
+  .hero .eyebrow{color:var(--blue);font-weight:600;font-size:0.85rem;letter-spacing:0.02em;text-transform:uppercase;}
+  .hero h1{font-size:2.4rem;margin:10px 0 6px;}
+  .hero .sub{font-size:1.2rem;color:var(--muted);margin:0 0 16px;font-family:'Manrope',sans-serif;font-weight:600;}
+  .hero p{color:var(--muted);font-size:1rem;line-height:1.7;max-width:560px;margin:0 auto 26px;}
+  .btn{
+    display:inline-block;background:var(--blue);color:var(--white);text-decoration:none;
+    font-weight:600;font-size:0.95rem;padding:12px 22px;border-radius:10px;
+    font-family:'Inter',sans-serif;
+  }
+  .btn:hover{background:#1D4ED8;}
+
+  section.section{padding:20px 0 56px;}
+  .section-label{font-size:0.8rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em;margin-bottom:16px;}
+
+  /* reusable article card */
+  .article-card{
+    display:flex;gap:22px;align-items:flex-start;background:var(--white);
+    border:1px solid var(--line);border-radius:16px;padding:26px;
+    text-decoration:none;color:inherit;
+  }
+  .article-card.featured{padding:32px;}
+  .article-card .icon{
+    flex:0 0 auto;width:52px;height:52px;border-radius:12px;background:var(--blue-soft);
+    display:flex;align-items:center;justify-content:center;
+  }
+  .article-card .cat{color:var(--blue);font-weight:600;font-size:0.78rem;text-transform:uppercase;letter-spacing:0.03em;}
+  .article-card h2, .article-card h3{margin:6px 0 8px;}
+  .article-card.featured h2{font-size:1.5rem;}
+  .article-card p.desc{color:var(--muted);font-size:0.95rem;line-height:1.6;margin:0 0 14px;}
+  .article-card .meta{color:var(--muted-2);font-size:0.8rem;margin-bottom:14px;}
+  .article-card .read-more{color:var(--blue);font-weight:600;font-size:0.9rem;}
+
+  .grid{display:grid;grid-template-columns:1fr;gap:16px;}
+
+  .cta-band{
+    background:var(--navy);border-radius:18px;padding:40px 32px;text-align:center;color:var(--white);
+  }
+  .cta-band h2{color:var(--white);margin:0 0 10px;font-size:1.5rem;}
+  .cta-band p{color:#B9C2D0;max-width:520px;margin:0 auto 22px;line-height:1.6;}
+
+  footer.site-footer{background:var(--navy);color:var(--muted-2);padding:44px 24px 28px;margin-top:20px;}
+  .footer-inner{max-width:900px;margin:0 auto;}
+  .footer-brand{display:flex;align-items:center;gap:8px;font-family:'Manrope',sans-serif;font-weight:800;color:var(--white);font-size:1.05rem;}
+  .footer-tagline{font-size:0.82rem;color:var(--muted-2);margin-top:6px;max-width:320px;line-height:1.5;}
+  .footer-links{margin-top:20px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.1);}
+  .footer-links a{color:var(--muted-2);font-size:0.82rem;text-decoration:none;margin-right:20px;}
+  .footer-links a:hover{color:var(--white);}
+  .footer-copyright{font-size:0.76rem;color:#475569;margin-top:20px;}
+
+  @media(min-width:640px){
+    .grid{grid-template-columns:1fr 1fr;}
+    .hero h1{font-size:3rem;}
+  }
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="brand">
+    <a href="/">
+      <svg width="24" height="24" viewBox="0 0 26 26" fill="none">
+        <path d="M19 5 C19 5 8 5 8 9.5 C8 14 19 12 19 16.5 C19 21 8 21 8 21" stroke="#2563EB" stroke-width="2.6" stroke-linecap="round" fill="none"/>
+      </svg>
+      SafVia
+    </a>
+  </div>
+  <a href="/" class="btn" style="padding:9px 16px;font-size:0.85rem;">Know Your Car with SafVia →</a>
+</header>
+
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow">Car Advice</div>
+    <h1>Simple answers for everyday drivers.</h1>
+    <p>Practical guides to help you understand, maintain and look after your car — without needing to be a mechanic.</p>
+    <a href="/" class="btn">Know Your Car with SafVia →</a>
+  </div>
+
+  <section class="section">
+    <div class="section-label">Featured guide</div>
+    <a class="article-card featured" href="/car-advice/car-dashboard-warning-lights/">
+      <div class="icon">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/>
+          <line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+      </div>
+      <div>
+        <div class="cat">Warning lights</div>
+        <h2>Car Dashboard Warning Lights: What They Mean & What You Should Do</h2>
+        <p class="desc">A light's come on and you're not sure how worried to be. Here's a plain-English guide to what the common ones mean, how serious they are, and when to stop driving — for UK drivers.</p>
+        <div class="meta">Published 10 September 2026</div>
+        <span class="read-more">Read the guide →</span>
+      </div>
+    </a>
+  </section>
+
+  <section class="section">
+    <div class="section-label">More guides</div>
+    <div class="grid">
+      <!--
+        Future article cards go here. Copy the structure below for each new guide:
+
+        <a class="article-card" href="/car-advice/YOUR-SLUG/">
+          <div class="icon">...svg icon...</div>
+          <div>
+            <div class="cat">CATEGORY</div>
+            <h3>ARTICLE TITLE</h3>
+            <p class="desc">SHORT DESCRIPTION</p>
+            <div class="meta">Published DATE</div>
+            <span class="read-more">Read more →</span>
+          </div>
+        </a>
+      -->
+    </div>
+  </section>
+
+  <section class="section">
+    <div class="cta-band">
+      <h2>Know Your Car. Before You Need To.</h2>
+      <p>Your car's warning lights are only one part of the picture. SafVia helps you keep important information about your vehicle accessible when you need it.</p>
+      <a href="/" class="btn">Explore SafVia →</a>
+    </div>
+  </section>
+</div>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <div class="footer-brand">
+      <svg width="20" height="20" viewBox="0 0 26 26" fill="none">
+        <path d="M19 5 C19 5 8 5 8 9.5 C8 14 19 12 19 16.5 C19 21 8 21 8 21" stroke="#2563EB" stroke-width="2.6" stroke-linecap="round" fill="none"/>
+      </svg>
+      SafVia
+    </div>
+    <div class="footer-tagline">Safe journeys. Smarter decisions. Your AI companion for understanding, maintaining and protecting your car.</div>
+    <div class="footer-links">
+      <a href="/">Back to SafVia</a>
+      <a href="/car-advice/">Car Advice</a>
+    </div>
+    <div class="footer-copyright">© 2026 SafVia. Not a substitute for a qualified mechanic. In an emergency, pull over safely and call for assistance.</div>
+  </div>
+</footer>
+
+</body>
+</html>
