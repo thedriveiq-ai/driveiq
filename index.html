@@ -314,11 +314,11 @@
     display:flex;flex-wrap:wrap;gap:8px 22px;font-size:0.82rem;
     border-top:1px solid rgba(255,255,255,0.1);padding-top:20px;
   }
-  .footer-links button{
+  .footer-links button, .footer-links a {
     background:none;border:none;color:var(--muted-2);font-size:0.82rem;
-    font-family:'Inter',sans-serif;cursor:pointer;padding:0;
+    font-family:'Inter',sans-serif;cursor:pointer;padding:0;text-decoration:none;
   }
-  .footer-links button:hover{color:var(--white);}
+  .footer-links button, .footer-links a:hover{color:var(--white);}
   .footer-copyright{font-size:0.76rem;color:#475569;margin-top:20px;}
 
   /* generic content modal (Mission, About, Terms, Privacy) */
@@ -705,6 +705,7 @@
     </div>
     <div class="footer-links">
       <button onclick="openInfo('mission')">Our mission</button>
+      <a href="/car-advice/">Car Advice</a>
       <button onclick="openInfo('founder')">About the founder</button>
       <button onclick="openInfo('contact')">Contact</button>
       <button onclick="openInfo('terms')">Terms of use</button>
